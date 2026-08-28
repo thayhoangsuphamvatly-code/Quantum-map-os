@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1" />
+<title>Đăng nhập · MapViet Neon</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@600;800&family=Rajdhani:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+<div id="app">
+  <canvas id="bg-canvas"></canvas>
+
+  <div class="auth-screen">
+    <div class="auth-card">
+      <div class="auth-logo">
+        <div class="logo-mark">🛰️</div>
+        <div>
+          <h1>MAPVIET NEON</h1>
+          <span>HỆ THỐNG BẢN ĐỒ &amp; ĐIỀU HƯỚNG</span>
+        </div>
+      </div>
+      <p class="subtitle">Đăng nhập để tìm kiếm địa điểm, chỉ đường và lưu nơi yêu thích.</p>
+
+      <div class="auth-error" id="loginError"></div>
+
+      <form id="loginForm">
+        <div class="field">
+          <label>Tài khoản</label>
+          <input type="text" id="username" autocomplete="username" placeholder="Nhập tên tài khoản" required />
+        </div>
+        <div class="field">
+          <label>Mật khẩu</label>
+          <input type="password" id="password" autocomplete="current-password" placeholder="Nhập mật khẩu" required />
+        </div>
+        <button type="submit" class="btn btn-primary" id="loginBtn">Đăng nhập</button>
+      </form>
+
+      <p class="auth-note">
+        Hệ thống <b>không hỗ trợ tự đăng ký</b>.<br/>
+        Tài khoản chỉ được cấp bởi <b>Quản trị viên (Admin)</b>.
+      </p>
+    </div>
+  </div>
+</div>
+
+<script src="js/bg-canvas.js"></script>
+<script src="js/api.js"></script>
+<script src="js/login.js"></script>
+</body>
+</html>
