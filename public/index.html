@@ -4,10 +4,15 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1" />
 <title>MapViet Neon</title>
+<meta name="theme-color" content="#07061a" />
+<link rel="manifest" href="manifest.json" />
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
+<link rel="icon" href="icons/icon-192.png" />
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@600;800&family=Rajdhani:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
   integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <link rel="stylesheet" href="css/style.css" />
 </head>
 <body>
@@ -40,12 +45,19 @@
         </div>
       </nav>
 
+      <button class="nav-item install-nav-item" id="installBtnDesktop">
+        <span class="ic">⬇️</span> Tải Ứng Dụng
+      </button>
+
       <div class="sidebar-foot">
         <div class="user-chip">
           <div class="avatar" id="avatarInitial">?</div>
           <div class="info">
             <div class="name" id="userFullName">—</div>
-            <div class="role" id="userRoleLabel">—</div>
+            <div class="role-row">
+              <span class="role" id="userRoleLabel">—</span>
+              <span class="tier-badge" id="userTierBadge" style="display:none;">PRO</span>
+            </div>
           </div>
         </div>
         <button class="icon-btn" id="logoutBtn" title="Đăng xuất">⏻</button>
@@ -62,10 +74,13 @@
           <button class="panel-close" data-close="routePanel">✕</button>
         </div>
         <div class="panel-body">
-          <div class="mode-switch">
-            <div class="mode-btn active" data-mode="driving">🚗 Ô tô</div>
-            <div class="mode-btn" data-mode="walking">🚶 Đi bộ</div>
+          <div class="mode-switch" id="modeSwitch">
+            <div class="mode-btn active" data-mode="driving" title="Ô tô">🚗<span>Ô tô</span></div>
+            <div class="mode-btn" data-mode="motorbike" title="Xe máy">🏍️<span>Xe máy</span></div>
+            <div class="mode-btn" data-mode="cycling" title="Xe đạp">🚲<span>Xe đạp</span></div>
+            <div class="mode-btn" data-mode="walking" title="Đi bộ">🚶<span>Đi bộ</span></div>
           </div>
+          <p class="hint-text" id="motorbikeHint" style="display:none;">Lưu ý: chưa có máy chủ chỉ đường miễn phí riêng cho xe máy nên tuyến đường đang xấp xỉ theo hồ sơ ô tô.</p>
 
           <div class="route-points-wrap">
             <div class="route-point">
@@ -81,13 +96,36 @@
             <button class="route-swap-btn" id="btnSwapRoute" title="Đổi chiều điểm đi/đến">⇅</button>
           </div>
 
-          <button class="btn btn-primary" id="btnFindRoute" style="width:100%;">Tìm đường ngắn nhất</button>
+          <!-- CHI PRO/ADMIN: chon uu tien tuyen duong -->
+          <div class="pro-only pref-row" id="prefRow" style="display:none;">
+            <span class="pref-label">✨ PRO · Ưu tiên</span>
+            <div class="mode-switch small">
+              <div class="mode-btn active" data-prefer="fastest">⚡ Nhanh nhất</div>
+              <div class="mode-btn" data-prefer="shortest">📏 Ngắn nhất</div>
+            </div>
+          </div>
+
+          <button class="btn btn-primary" id="btnFindRoute" style="width:100%;">Tìm đường</button>
           <p class="hint-text">Mẹo: bấm biểu tượng 📌 rồi nhấp vào bản đồ để chọn điểm đi / điểm đến chính xác. Bạn cũng có thể dùng nút 📍 để lấy vị trí hiện tại làm điểm đi.</p>
+
+          <!-- CHI PRO/ADMIN: canh bao khu vuc uoc tinh dong duc -->
+          <div class="congestion-banner pro-only" id="congestionBanner" style="display:none;">
+            <div class="cb-head"><span id="cbIcon">⚠️</span> <span id="cbTitle">Khu vực có thể đông đúc</span></div>
+            <div class="cb-note">Ước tính theo khung giờ cao điểm — không phải dữ liệu cảm biến thời gian thực.</div>
+          </div>
 
           <div class="route-summary" id="routeSummary">
             <div class="big" id="routeDistance">—</div>
             <div class="sub" id="routeDuration">—</div>
+            <div class="nav-controls">
+              <button class="btn btn-primary btn-sm" id="btnStartNav">▶ Bắt đầu</button>
+              <button class="btn btn-danger btn-sm" id="btnStopNav" style="display:none;">■ Dừng</button>
+            </div>
+            <div class="nav-status" id="navStatus" style="display:none;"></div>
           </div>
+
+          <!-- CHI PRO/ADMIN: danh sach cac tuyen thay the -->
+          <div class="route-alternatives pro-only" id="routeAlternatives" style="display:none;"></div>
         </div>
       </div>
 
@@ -98,8 +136,72 @@
           <h3>⭐ Địa điểm yêu thích</h3>
           <button class="panel-close" data-close="favPanel">✕</button>
         </div>
-        <div class="panel-body" id="favListBody">
-          <div class="empty-state">Chưa có địa điểm yêu thích nào.<br/>Tìm kiếm hoặc nhấp giữ trên bản đồ để thêm.</div>
+        <div class="panel-body">
+          <div class="fav-filter-chips" id="favFilterChips">
+            <button class="fav-chip active" data-cat="all">Tất cả</button>
+            <button class="fav-chip" data-cat="home">🏠 Nhà</button>
+            <button class="fav-chip" data-cat="work">🏢 Công ty</button>
+            <button class="fav-chip" data-cat="food">🍔 Ăn uống</button>
+            <button class="fav-chip" data-cat="travel">🧳 Du lịch</button>
+            <button class="fav-chip" data-cat="shopping">🛍️ Mua sắm</button>
+            <button class="fav-chip" data-cat="other">📍 Khác</button>
+          </div>
+          <div id="favListBody">
+            <div class="empty-state">Chưa có địa điểm yêu thích nào.<br/>Tìm kiếm hoặc nhấp giữ trên bản đồ để thêm.</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- PLACE DETAIL PANEL (giong the thong tin dia diem cua Google Maps) -->
+      <div class="side-panel place-panel" id="placePanel">
+        <div class="sheet-handle-bar"></div>
+        <div class="panel-head">
+          <h3>📍 Chi tiết địa điểm</h3>
+          <button class="panel-close" data-close="placePanel">✕</button>
+        </div>
+        <div class="panel-body no-pad">
+          <div class="place-hero" id="placeHero">🏞️</div>
+          <div class="place-info">
+            <h2 class="place-title" id="placeName">—</h2>
+            <div class="place-address" id="placeAddress"></div>
+            <div class="place-weather" id="placeWeather" style="display:none;"></div>
+
+            <div class="place-actions">
+              <button class="place-action" id="placeActionDirections">
+                <span class="pa-ic pa-ic-primary">➤</span><span>Đường đi</span>
+              </button>
+              <button class="place-action" id="placeActionSave">
+                <span class="pa-ic">🔖</span><span>Lưu</span>
+              </button>
+              <button class="place-action" id="placeActionNearby">
+                <span class="pa-ic">🧭</span><span>Gần đó</span>
+              </button>
+              <button class="place-action" id="placeActionSend">
+                <span class="pa-ic">📲</span><span>Gửi tới<br/>điện thoại</span>
+              </button>
+              <button class="place-action" id="placeActionShare">
+                <span class="pa-ic">🔗</span><span>Chia sẻ</span>
+              </button>
+            </div>
+
+            <div class="place-section" id="nearbySection" style="display:none;">
+              <div class="place-section-title">Gần đó</div>
+              <div class="nearby-tabs" id="nearbyTabs">
+                <button class="nearby-tab active" data-cat="hotel">🏨 Khách sạn</button>
+                <button class="nearby-tab" data-cat="restaurant">🍜 Ăn uống</button>
+                <button class="nearby-tab" data-cat="cafe">☕ Cà phê</button>
+                <button class="nearby-tab" data-cat="gas_station">⛽ Xăng dầu</button>
+                <button class="nearby-tab" data-cat="atm">🏧 ATM</button>
+                <button class="nearby-tab" data-cat="pharmacy">💊 Nhà thuốc</button>
+              </div>
+              <div class="nearby-carousel" id="nearbyCarousel"></div>
+            </div>
+
+            <div class="place-section" id="photosSection" style="display:none;">
+              <div class="place-section-title">Ảnh</div>
+              <div class="place-photos" id="placePhotos"></div>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -109,7 +211,7 @@
           <div class="search-box">
             <div class="search-input-row">
               <span class="ic">🔍</span>
-              <input type="text" id="searchInput" placeholder="Tìm địa điểm, địa chỉ..." />
+              <input type="text" id="searchInput" placeholder="Tìm địa điểm, địa chỉ..." autocomplete="off" />
               <button class="go-btn" id="searchBtn">Tìm</button>
             </div>
             <div class="search-results" id="searchResults" style="display:none;"></div>
@@ -122,6 +224,8 @@
         </div>
 
         <div id="map"></div>
+
+        <div class="map-weather-badge" id="mapWeatherBadge" style="display:none;"></div>
       </div>
     </main>
   </div>
@@ -142,9 +246,13 @@
         <div class="avatar" id="avatarInitialMobile">?</div>
         <div class="info">
           <div class="name" id="userFullNameMobile">—</div>
-          <div class="role" id="userRoleLabelMobile">—</div>
+          <div class="role-row">
+            <span class="role" id="userRoleLabelMobile">—</span>
+            <span class="tier-badge" id="userTierBadgeMobile" style="display:none;">PRO</span>
+          </div>
         </div>
       </div>
+      <button class="sheet-item" id="installBtnMobile"><span class="ic">⬇️</span> Tải Ứng Dụng</button>
       <button class="sheet-item" id="navAdminMobile" style="display:none;"><span class="ic">🛡️</span> Quản Lý Tài Khoản</button>
       <button class="sheet-item danger" id="logoutBtnMobile"><span class="ic">⏻</span> Đăng xuất</button>
     </div>
@@ -166,6 +274,7 @@
             <th>Tài Khoản</th>
             <th>Họ Tên</th>
             <th>Vai Trò</th>
+            <th>Hạng</th>
             <th>Trạng Thái</th>
             <th>Quyền Sử Dụng</th>
             <th>Thao Tác</th>
@@ -200,6 +309,13 @@
           <option value="ADMIN">ADMIN</option>
         </select>
       </div>
+      <div class="field" id="mTierField">
+        <label>Hạng tài khoản</label>
+        <select class="role-select" id="mTier" style="width:100%;">
+          <option value="STANDARD">STANDARD — tìm đường cơ bản</option>
+          <option value="PRO">PRO — tuyến nhanh nhất/ngắn nhất, cảnh báo tắc đường</option>
+        </select>
+      </div>
       <div class="field">
         <label>Giới hạn tính năng cho tài khoản này</label>
         <div class="perm-check-row">
@@ -226,9 +342,46 @@
     </div>
   </div>
 
+  <!-- ============ MODAL: chon danh muc khi luu yeu thich ============ -->
+  <div class="modal-overlay" id="categoryModal">
+    <div class="modal-card">
+      <h3>Lưu vào Yêu thích</h3>
+      <p class="hint-text" id="categoryModalPlaceName">—</p>
+      <div class="category-pick-grid">
+        <button class="category-pick" data-cat="home">🏠<span>Nhà</span></button>
+        <button class="category-pick" data-cat="work">🏢<span>Công ty</span></button>
+        <button class="category-pick" data-cat="food">🍔<span>Ăn uống</span></button>
+        <button class="category-pick" data-cat="travel">🧳<span>Du lịch</span></button>
+        <button class="category-pick" data-cat="shopping">🛍️<span>Mua sắm</span></button>
+        <button class="category-pick active" data-cat="other">📍<span>Khác</span></button>
+      </div>
+      <div class="modal-actions">
+        <button class="btn btn-ghost" id="btnCancelCategoryModal">Hủy</button>
+        <button class="btn btn-primary" id="btnConfirmSaveFavorite">Lưu địa điểm</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ MODAL: Gui toi dien thoai (QR) ============ -->
+  <div class="modal-overlay" id="qrModal">
+    <div class="modal-card" style="text-align:center;">
+      <h3>📲 Gửi tới điện thoại</h3>
+      <p class="hint-text">Dùng điện thoại quét mã QR bên dưới để mở đúng vị trí này trong MapViet Neon.</p>
+      <div id="qrCodeBox" class="qr-box"></div>
+      <div class="field" style="margin-top:14px;">
+        <input type="text" id="qrShareLink" readonly style="text-align:center;" />
+      </div>
+      <div class="modal-actions">
+        <button class="btn btn-ghost" id="btnCloseQrModal">Đóng</button>
+        <button class="btn btn-primary" id="btnCopyShareLink">Sao chép liên kết</button>
+      </div>
+    </div>
+  </div>
+
   <div class="toast" id="toast"></div>
 </div>
 
+<script src="js/pwa.js"></script>
 <script src="js/bg-canvas.js"></script>
 <script src="js/api.js"></script>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"

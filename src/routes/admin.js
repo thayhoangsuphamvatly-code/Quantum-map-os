@@ -13,7 +13,7 @@ router.get("/users", (req, res) => {
 
 // Tao tai khoan moi - CHI ADMIN duoc phep (khong co dang ky cong khai)
 router.post("/users", (req, res) => {
-  const { username, password, fullName, role, permissions } = req.body || {};
+  const { username, password, fullName, role, tier, permissions } = req.body || {};
   if (!username || !password) {
     return res.status(400).json({ error: "Vui long nhap ten tai khoan va mat khau" });
   }
@@ -21,7 +21,7 @@ router.post("/users", (req, res) => {
     return res.status(400).json({ error: "Mat khau phai co it nhat 6 ky tu" });
   }
   try {
-    const user = store.createUser({ username: username.trim(), password, fullName, role, permissions });
+    const user = store.createUser({ username: username.trim(), password, fullName, role, tier, permissions });
     res.status(201).json({ user });
   } catch (e) {
     res.status(400).json({ error: e.message });

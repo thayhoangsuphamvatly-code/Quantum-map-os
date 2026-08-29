@@ -11,11 +11,11 @@ router.get("/", (req, res) => {
 });
 
 router.post("/", (req, res) => {
-  const { name, lat, lng, address } = req.body || {};
+  const { name, lat, lng, address, category } = req.body || {};
   if (typeof lat !== "number" || typeof lng !== "number") {
     return res.status(400).json({ error: "Thieu toa do lat/lng" });
   }
-  const fav = store.addFavorite(req.user.id, { name, lat, lng, address });
+  const fav = store.addFavorite(req.user.id, { name, lat, lng, address, category });
   res.status(201).json({ favorite: fav });
 });
 

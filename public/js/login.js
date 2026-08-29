@@ -1,7 +1,7 @@
 (function () {
-  // Neu da dang nhap roi thi vao thang trang chinh
+  // Neu da dang nhap roi thi vao thang trang chinh (giu lai toa do neu co)
   if (Api.getToken()) {
-    window.location.href = "index.html";
+    window.location.href = "index.html" + window.location.search;
     return;
   }
 
@@ -20,7 +20,9 @@
     try {
       const data = await Api.post("/api/auth/login", { username, password });
       Api.setToken(data.token);
-      window.location.href = "index.html";
+      // Giu lai query string (vi du toa do tu lien ket "Gui toi dien thoai")
+      // de mo dung vi tri da chia se ngay sau khi dang nhap.
+      window.location.href = "index.html" + window.location.search;
     } catch (err) {
       errorBox.textContent = err.message || "Đăng nhập thất bại";
       errorBox.classList.add("show");

@@ -1,17 +1,53 @@
 # MapViet Neon 🛰️
 
-Ứng dụng bản đồ kiểu Google Maps, giao diện **neon tối** giống ảnh mẫu bạn gửi, dùng **Leaflet** (OpenStreetMap) cho phần bản đồ, có **backend + frontend** đầy đủ, **đăng nhập** (không có đăng ký công khai), **tài khoản Admin** quản lý toàn bộ tài khoản người dùng và **giới hạn tính năng** theo từng tài khoản.
+Ứng dụng bản đồ kiểu Google Maps, giao diện **neon tối**, dùng **Leaflet** (OpenStreetMap) cho phần bản đồ, có **backend + frontend** đầy đủ, **3 hạng tài khoản** (Admin / Pro / Thường), và **cài đặt được như một ứng dụng thật (PWA)** trên cả điện thoại lẫn máy tính.
 
 ## Tính năng
 
-- 🔍 Tìm kiếm địa điểm / địa chỉ (Nominatim - OpenStreetMap)
-- 📍 Định vị vị trí hiện tại của bạn (GPS trình duyệt)
-- 🧭 Tìm đường đi **ngắn nhất** cho **ô tô** và **đi bộ** (OSRM), hiển thị quãng đường + thời gian ước tính
-- ⭐ Lưu / xóa **địa điểm yêu thích** (bấm chuột phải trên bản đồ, hoặc từ kết quả tìm kiếm)
+- 🔍 **Tìm kiếm gợi ý tức thời**: gõ tới đâu gợi ý tới đó (Nominatim - OpenStreetMap), điều hướng bằng bàn phím (↑ ↓ Enter)
+- 📍 Định vị vị trí hiện tại (GPS trình duyệt)
+- 🧭 Tìm đường cho **4 phương tiện**: Ô tô, Xe máy (xấp xỉ theo hồ sơ ô tô), Xe đạp, Đi bộ
+- 📇 **Thẻ chi tiết địa điểm** kiểu Google Maps: ảnh minh họa thật (Wikimedia Commons), thời tiết hiện tại, địa chỉ, và các nút **Đường đi / Lưu / Gần đó / Gửi tới điện thoại (QR) / Chia sẻ**
+- 🏨 **Gợi ý địa điểm lân cận** theo danh mục (khách sạn, ăn uống, cà phê, xăng dầu, ATM, nhà thuốc...) — dữ liệu OpenStreetMap thật qua Overpass API
+- ⭐ **Yêu thích có phân loại**: Nhà / Công ty / Ăn uống / Du lịch / Mua sắm / Khác, lọc nhanh bằng chip
+- 🌦️ **Thời tiết thời gian thực** tại vị trí trung tâm bản đồ và tại từng địa điểm (Open-Meteo — miễn phí, không cần khóa API)
+- 🚦 Hiển thị **đèn giao thông** thật trên tuyến đường (dữ liệu OpenStreetMap)
+- ⚠️ **Cảnh báo khu vực có thể đông đúc** theo khung giờ cao điểm — xem mục "Minh bạch dữ liệu" bên dưới
+- ▶️ **Điều hướng trực tiếp**: bấm "Bắt đầu" để liên tục cập nhật vị trí của bạn trên bản đồ và khoảng cách còn lại theo thời gian thực
+- ⬇️ **Tải Ứng Dụng**: cài MapViet Neon như một ứng dụng thật (PWA) trên cả điện thoại và máy tính, có icon riêng, mở toàn màn hình không cần trình duyệt
 - 🔐 Đăng nhập bằng JWT, **không có trang đăng ký** — chỉ Admin được tạo tài khoản
-- 🛡️ Trang **Quản Lý Tài Khoản** (chỉ Admin thấy được): tạo / sửa / khóa / xóa tài khoản, đổi vai trò, và **bật/tắt từng quyền tính năng** (tìm kiếm, tìm đường, định vị, yêu thích) cho từng người dùng
-- 📱 Giao diện **responsive**: máy tính, tablet, điện thoại (sidebar thu gọn thành menu ☰ trên di động)
-- 🎨 Giao diện neon tối: nền chòm sao chuyển động, viền phát sáng, gradient cyan/tím/hồng giống ảnh mẫu
+- 🛡️ Trang **Quản Lý Tài Khoản** (chỉ Admin thấy được): tạo/sửa/khóa/xóa tài khoản, đổi vai trò, đổi **hạng tài khoản**, và bật/tắt từng quyền tính năng
+- 📱 Giao diện **responsive** thật sự: trên máy tính panel Tìm đường/Yêu thích/Chi tiết địa điểm **neo cạnh bản đồ** (không đè lên), trên điện thoại có thanh điều hướng dưới cùng + bottom-sheet giống app bản đồ di động
+- 🎨 Giao diện neon tối: nền chòm sao chuyển động, viền phát sáng, gradient cyan/tím/hồng
+
+## 3 hạng tài khoản
+
+| Hạng | Quyền hạn |
+|---|---|
+| **ADMIN** | Toàn quyền: quản lý mọi tài khoản, tự động có đầy đủ tính năng PRO |
+| **PRO** | Tìm đường **nhiều lựa chọn tuyến** (nhanh nhất/ngắn nhất), xem **các tuyến thay thế**, **cảnh báo khu vực có thể đông đúc / cảnh báo đỏ**, xem đèn giao thông & cảnh báo trên tuyến |
+| **STANDARD (Thường)** | Tìm đường cơ bản — một tuyến duy nhất, giống bản Google Maps thông thường, không có các cảnh báo nâng cao |
+
+Cả 3 hạng đều có thể bị Admin **giới hạn thêm** từng tính năng riêng lẻ (tìm kiếm / tìm đường / định vị / yêu thích) độc lập với hạng tài khoản.
+
+## ⚠️ Minh bạch dữ liệu (quan trọng, xin đọc kỹ)
+
+Ứng dụng này dùng **100% dịch vụ bản đồ miễn phí, không cần khóa API trả phí**. Điều đó có nghĩa một số tính năng là **ước tính hoặc xấp xỉ** thay vì dữ liệu cảm biến thời gian thực thật — đội ngũ phát triển cam kết không bịa số liệu:
+
+- **"Khu vực có thể đông đúc" / cảnh báo đỏ (PRO)**: đây là **ước tính dựa trên khung giờ cao điểm** (giờ đi làm 7–9h, 17–19h) kết hợp độ dài quãng đường, **không phải dữ liệu cảm biến giao thông thời gian thực**. Muốn có dữ liệu tắc đường thời gian thực thật (như Google Maps), cần tích hợp API trả phí (Google Maps Platform, TomTom, HERE...).
+- **Tuyến đường xe máy**: chưa có máy chủ chỉ đường miễn phí công khai dành riêng cho xe máy, nên hệ thống **xấp xỉ bằng hồ sơ định tuyến ô tô** — ứng dụng luôn hiển thị rõ lưu ý này trong giao diện.
+- **Đèn giao thông & cảnh báo công trình**: là dữ liệu **thật** từ cộng đồng OpenStreetMap (Overpass API), nhưng có thể **không đầy đủ 100%** tùy khu vực đã được người dùng OSM cập nhật hay chưa.
+- **Ảnh địa điểm**: lấy thật từ Wikimedia Commons theo tên địa điểm — chỉ hiển thị khi tìm thấy ảnh phù hợp; không phải mọi địa chỉ đều có ảnh (khác với Google Street View, vốn cần hợp đồng trả phí).
+- **Giá khách sạn/giá phòng**: ứng dụng **không hiển thị giá** trong mục "Gần đó" vì việc lấy giá thật theo thời gian thực yêu cầu hợp tác trả phí với các nền tảng đặt phòng (Booking.com, Google Hotels...) — hiển thị giá bịa sẽ gây hiểu lầm cho người dùng nên chúng tôi không làm vậy.
+- **Điều hướng trực tiếp**: vị trí của bạn được cập nhật liên tục qua GPS trình duyệt; tuyến đường được **làm mới định kỳ mỗi ~25 giây** (không phải mỗi giây) để tránh làm quá tải máy chủ định tuyến miễn phí công cộng.
+
+## Nút "Tải Ứng Dụng"
+
+Đây là tính năng **Progressive Web App (PWA) thật**, không phải liên kết giả tới cửa hàng ứng dụng:
+
+- **Trên máy tính** (Chrome/Edge): bấm nút sẽ hiện hộp thoại cài đặt của trình duyệt, sau khi cài app sẽ có icon riêng và mở như phần mềm độc lập.
+- **Trên Android** (Chrome): tương tự, cài thẳng vào màn hình chính.
+- **Trên iPhone/iPad** (Safari): iOS không cho phép hộp thoại cài tự động, ứng dụng sẽ hướng dẫn bạn bấm nút Chia sẻ → "Thêm vào Màn hình chính".
 
 ## Tài khoản Admin mặc định
 
@@ -85,19 +121,23 @@ git push -u origin main
 mapviet/
   server.js              # Điểm khởi động Express
   src/
-    store.js              # "Database" JSON: users, favorites
+    store.js              # "Database" JSON: users (role+tier+permissions), favorites (có category)
     auth.js                # Ký & xác minh JWT
-    middleware.js           # Xác thực đăng nhập, kiểm tra quyền Admin/permission
+    middleware.js           # Xác thực đăng nhập, kiểm tra quyền Admin/permission/PRO
     routes/
       auth.js               # POST /api/auth/login, GET /api/auth/me
-      admin.js              # CRUD tài khoản (chỉ Admin)
-      favorites.js          # CRUD địa điểm yêu thích (theo từng user)
-      geo.js                # Proxy tìm kiếm (Nominatim) + tìm đường (OSRM)
+      admin.js              # CRUD tài khoản + hạng tài khoản (chỉ Admin)
+      favorites.js          # CRUD địa điểm yêu thích có phân loại (theo từng user)
+      geo.js                # Proxy: tìm kiếm, tìm đường (nhiều phương tiện),
+                             # thời tiết, ảnh, địa điểm lân cận, đèn giao thông
   public/                  # Frontend tĩnh (HTML/CSS/JS thuần, không cần build)
     login.html
     index.html
+    manifest.json           # Khai báo PWA (tên, icon, màu nền...)
+    sw.js                   # Service worker (bắt buộc để "Tải Ứng Dụng" hoạt động)
+    icons/                  # Icon PWA (192px, 512px, apple-touch-icon)
     css/style.css
-    js/{bg-canvas,api,login,app,map,admin}.js
+    js/{pwa,bg-canvas,api,login,app,map,admin}.js
   data/db.json             # Tự sinh khi chạy lần đầu
 ```
 
@@ -106,5 +146,9 @@ mapviet/
 - Mật khẩu được băm bằng `bcryptjs`, không lưu dạng thô.
 - Đổi `JWT_SECRET` bằng biến môi trường khi đưa lên production (mặc định trong `src/auth.js` chỉ dùng để chạy thử).
 - Dữ liệu lưu ở file JSON để dễ chạy ở bất kỳ máy nào không cần cài database ngoài. Nếu triển khai quy mô lớn, có thể thay `src/store.js` bằng PostgreSQL/MongoDB mà không cần đổi các route phía trên (giữ nguyên các hàm export).
-- Tìm kiếm & tìm đường dùng dịch vụ **miễn phí** của OpenStreetMap (Nominatim) và **OSRM demo server** — phù hợp để học tập/demo. Nếu dùng cho sản phẩm thật với lượng truy cập lớn, nên đăng ký dịch vụ geocoding/routing trả phí (Mapbox, Google, GraphHopper...) để đảm bảo giới hạn tần suất.
+- Tìm kiếm & tìm đường dùng dịch vụ **miễn phí** của OpenStreetMap (Nominatim, OSRM demo server, routing.openstreetmap.de) — phù hợp để học tập/demo. Nếu dùng cho sản phẩm thật với lượng truy cập lớn, nên đăng ký dịch vụ geocoding/routing trả phí (Mapbox, Google, GraphHopper...) để đảm bảo giới hạn tần suất.
+- Thời tiết dùng **Open-Meteo** (miễn phí, không cần khóa API, giới hạn hợp lý cho ứng dụng vừa/nhỏ).
+- Địa điểm lân cận + đèn giao thông dùng **Overpass API** (`overpass-api.de`) — là dịch vụ cộng đồng miễn phí, có giới hạn tần suất công bằng (fair-use); nếu lưu lượng truy cập lớn, nên tự host Overpass instance riêng hoặc dùng dịch vụ trả phí.
+- Ảnh địa điểm dùng **Wikimedia Commons API** (miễn phí, không cần khóa API).
+- Tất cả các dịch vụ bên ngoài trên đều được gọi qua backend (không gọi thẳng từ trình duyệt), vừa để giấu chi tiết hạ tầng vừa để có thể kiểm soát quyền truy cập theo từng tài khoản.
 - CORS đang mở cho mọi nguồn (`cors()`), nên giới hạn origin cụ thể khi triển khai thật.

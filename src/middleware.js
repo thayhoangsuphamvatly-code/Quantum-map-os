@@ -40,4 +40,11 @@ function requirePermission(permKey) {
   };
 }
 
-module.exports = { authenticate, requireAdmin, requirePermission };
+// Chi tai khoan PRO hoac ADMIN moi duoc dung: nhieu lua chon tuyen duong,
+// canh bao khu vuc uoc tinh dong duc, v.v.
+function requirePro(req, res, next) {
+  if (req.user.role === "ADMIN" || req.user.tier === "PRO") return next();
+  return res.status(403).json({ error: "Tinh nang nay danh rieng cho tai khoan PRO. Vui long nang cap len PRO de su dung." });
+}
+
+module.exports = { authenticate, requireAdmin, requirePermission, requirePro };

@@ -71,6 +71,7 @@ function switchView(view) {
 
   document.getElementById("routePanel").classList.remove("open");
   document.getElementById("favPanel").classList.remove("open");
+  document.getElementById("placePanel").classList.remove("open");
 
   if (view === "route") {
     if (!AppState.user.permissions.route && AppState.user.role !== "ADMIN") {
@@ -138,6 +139,27 @@ function initNav() {
     if (e.target === moreOverlay) moreOverlay.classList.remove("open");
   });
   document.getElementById("navAdminMobile").addEventListener("click", () => switchView("admin"));
+
+  // Nut "Tai ung dung" (PWA that su - cai duoc ca may tinh lan dien thoai)
+  document.getElementById("installBtnDesktop").addEventListener("click", handleInstallClick);
+  document.getElementById("installBtnMobile").addEventListener("click", handleInstallClick);
+}
+
+async function handleInstallClick() {
+  if (!window.PwaInstall) return showToast("Không thể tải trình cài đặt ứng dụng", true);
+  if (PwaInstall.isStandalone()) {
+    return showToast("Bạn đang dùng MapViet Neon ở chế độ ứng dụng rồi 🎉");
+  }
+  if (PwaInstall.hasPrompt()) {
+    const outcome = await PwaInstall.promptInstall();
+    if (outcome === "accepted") showToast("Đang cài đặt MapViet Neon...");
+    return;
+  }
+  if (PwaInstall.isIos()) {
+    showToast("Trên iPhone/iPad: bấm nút Chia sẻ trên Safari, rồi chọn 'Thêm vào Màn hình chính'");
+    return;
+  }
+  showToast("Mở menu trình duyệt (⋮ hoặc ⋯) và chọn 'Cài đặt ứng dụng' / 'Install app'");
 }
 
 function doLogout() {
@@ -147,7 +169,9 @@ function doLogout() {
 
 async function bootstrap() {
   if (!Api.getToken()) {
-    window.location.href = "login.html";
+    // Giu lai query string (vi du toa do tu lien ket "Gui toi dien thoai")
+    // de sau khi dang nhap xong quay lai dung vi tri da chia se.
+    window.location.href = "login.html" + window.location.search;
     return;
   }
   try {
@@ -161,14 +185,17 @@ async function bootstrap() {
 
   const roleLabel = AppState.user.role === "ADMIN" ? "Quản trị viên" : "Người dùng";
   const initial = (AppState.user.fullName || "?").trim().charAt(0).toUpperCase();
+  const showProBadge = AppState.user.role === "ADMIN" || AppState.user.tier === "PRO";
 
   document.getElementById("userFullName").textContent = AppState.user.fullName;
   document.getElementById("userRoleLabel").textContent = roleLabel;
   document.getElementById("avatarInitial").textContent = initial;
+  document.getElementById("userTierBadge").style.display = showProBadge ? "inline-block" : "none";
 
   document.getElementById("userFullNameMobile").textContent = AppState.user.fullName;
   document.getElementById("userRoleLabelMobile").textContent = roleLabel;
   document.getElementById("avatarInitialMobile").textContent = initial;
+  document.getElementById("userTierBadgeMobile").style.display = showProBadge ? "inline-block" : "none";
 
   document.getElementById("shell").style.display = "flex";
 

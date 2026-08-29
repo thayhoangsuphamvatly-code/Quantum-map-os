@@ -26,11 +26,15 @@ const AdminModule = (() => {
 
   function renderTable() {
     const tbody = el("userTableBody");
-    tbody.innerHTML = usersCache.map(u => `
+    tbody.innerHTML = usersCache.map(u => {
+      const tierLabel = u.role === "ADMIN" ? "TOÀN QUYỀN" : (u.tier === "PRO" ? "PRO" : "STANDARD");
+      const tierClass = u.role === "ADMIN" ? "admin" : (u.tier === "PRO" ? "pro" : "standard");
+      return `
       <tr data-id="${u.id}">
         <td>${escapeHtml(u.username)}${u.isRoot ? ' <span class="perm-tag on" title="Tài khoản admin gốc">GỐC</span>' : ""}</td>
         <td>${escapeHtml(u.fullName)}</td>
         <td><span class="badge ${u.role === "ADMIN" ? "admin" : "user"}">${u.role}</span></td>
+        <td><span class="badge ${tierClass}">${tierLabel}</span></td>
         <td><span class="badge ${u.status === "active" ? "active" : "locked"}">${u.status === "active" ? "HOẠT ĐỘNG" : "ĐÃ KHÓA"}</span></td>
         <td><div class="perm-tags">${u.role === "ADMIN" ? '<span class="perm-tag on">Toàn quyền</span>' : permTags(u.permissions)}</div></td>
         <td>
@@ -41,7 +45,8 @@ const AdminModule = (() => {
           </div>
         </td>
       </tr>
-    `).join("");
+    `;
+    }).join("");
 
     tbody.querySelectorAll("[data-edit]").forEach(b => b.addEventListener("click", () => openEditModal(b.dataset.edit)));
     tbody.querySelectorAll("[data-del]").forEach(b => b.addEventListener("click", () => deleteUser(b.dataset.del)));
@@ -57,6 +62,8 @@ const AdminModule = (() => {
     el("mPassword").value = "";
     el("mPasswordLabel").textContent = "Mật khẩu";
     el("mRole").value = "USER";
+    el("mTier").value = "STANDARD";
+    updateTierFieldVisibility();
     setPermChecks({ search: true, route: true, locate: true, favorites: true });
     el("userModal").classList.add("open");
   }
@@ -72,8 +79,15 @@ const AdminModule = (() => {
     el("mPassword").value = "";
     el("mPasswordLabel").textContent = "Mật khẩu mới (để trống nếu không đổi)";
     el("mRole").value = u.role;
+    el("mTier").value = u.tier === "PRO" ? "PRO" : "STANDARD";
+    updateTierFieldVisibility();
     setPermChecks(u.permissions || {});
     el("userModal").classList.add("open");
+  }
+
+  function updateTierFieldVisibility() {
+    // Admin luon tu dong co day du tinh nang PRO nen an lua chon hang khi vai tro la ADMIN
+    el("mTierField").style.display = el("mRole").value === "ADMIN" ? "none" : "block";
   }
 
   function setPermChecks(p) {
@@ -94,19 +108,20 @@ const AdminModule = (() => {
       favorites: el("permFavorites").checked
     };
     const role = el("mRole").value;
+    const tier = el("mTier").value;
     const fullName = el("mFullName").value.trim();
     const password = el("mPassword").value;
 
     try {
       if (id) {
-        const payload = { fullName, role, permissions };
+        const payload = { fullName, role, tier, permissions };
         if (password) payload.password = password;
         await Api.patch(`/api/admin/users/${id}`, payload);
         showToast("Đã cập nhật tài khoản");
       } else {
         const username = el("mUsername").value.trim();
         if (!username || !password) return showToast("Vui lòng nhập đầy đủ tài khoản và mật khẩu", true);
-        await Api.post("/api/admin/users", { username, password, fullName, role, permissions });
+        await Api.post("/api/admin/users", { username, password, fullName, role, tier, permissions });
         showToast("Đã tạo tài khoản mới");
       }
       closeModal();
@@ -147,6 +162,7 @@ const AdminModule = (() => {
     el("btnCancelUserModal").addEventListener("click", closeModal);
     el("btnSaveUser").addEventListener("click", saveUser);
     el("userModal").addEventListener("click", (e) => { if (e.target.id === "userModal") closeModal(); });
+    el("mRole").addEventListener("change", updateTierFieldVisibility);
   }
 
   document.addEventListener("DOMContentLoaded", bindEvents);

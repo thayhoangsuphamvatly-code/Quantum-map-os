@@ -11,6 +11,15 @@ const DB_FILE = path.join(__dirname, "..", "data", "db.json");
 const ADMIN_USERNAME = "tunglaihoclaptrinhmobile@1234";
 const ADMIN_PASSWORD = "TtungnguyenhoangNHmobile@142010";
 
+// 3 hang tai khoan:
+// - ADMIN   : toan quyen, quan ly tai khoan, tu dong co moi tinh nang PRO
+// - PRO     : tim duong nang cao (tuyen nhanh nhat/ngan nhat, nhieu lua chon
+//             tuyen, canh bao khu vuc uoc tinh dong duc)
+// - STANDARD: tim duong co ban (mot tuyen duy nhat, giong Google Maps ban thuong)
+const TIERS = ["STANDARD", "PRO"];
+
+const FAVORITE_CATEGORIES = ["home", "work", "food", "travel", "shopping", "other"];
+
 function defaultPermissions(all = true) {
   return {
     search: all,   // duoc phep tim kiem dia diem
@@ -36,6 +45,7 @@ function seedDb() {
         passwordHash: adminHash,
         fullName: "Tung Nguyen (System Admin)",
         role: "ADMIN",
+        tier: "PRO", // Admin luon co day du tinh nang PRO
         status: "active",
         permissions: defaultPermissions(true),
         isRoot: true,
@@ -64,6 +74,13 @@ function ensureLoaded() {
       const seeded = seedDb();
       cache.users.unshift(seeded.users[0]);
     }
+    // Tuong thich nguoc: neu du lieu cu chua co truong "tier", gan mac dinh
+    cache.users.forEach(u => {
+      if (!u.tier) u.tier = u.role === "ADMIN" ? "PRO" : "STANDARD";
+    });
+    cache.favorites.forEach(f => {
+      if (!f.category) f.category = "other";
+    });
   } catch (e) {
     console.error("Loi doc database, khoi tao lai tu dau:", e.message);
     cache = seedDb();
@@ -100,17 +117,23 @@ function findUserById(id) {
   return cache.users.find(u => u.id === Number(id));
 }
 
-function createUser({ username, password, fullName, role, permissions }) {
+function normalizeTier(tier) {
+  return TIERS.includes(tier) ? tier : "STANDARD";
+}
+
+function createUser({ username, password, fullName, role, tier, permissions }) {
   ensureLoaded();
   if (findUserByUsername(username)) {
     throw new Error("Ten tai khoan da ton tai");
   }
+  const finalRole = role === "ADMIN" ? "ADMIN" : "USER";
   const user = {
     id: cache.nextUserId++,
     username,
     passwordHash: bcrypt.hashSync(password, 10),
     fullName: fullName || username,
-    role: role === "ADMIN" ? "ADMIN" : "USER",
+    role: finalRole,
+    tier: finalRole === "ADMIN" ? "PRO" : normalizeTier(tier),
     status: "active",
     permissions: { ...defaultPermissions(true), ...(permissions || {}) },
     isRoot: false,
@@ -130,6 +153,8 @@ function updateUser(id, updates) {
   }
   if (typeof updates.fullName === "string") user.fullName = updates.fullName;
   if (updates.role === "ADMIN" || updates.role === "USER") user.role = updates.role;
+  if (updates.tier) user.tier = normalizeTier(updates.tier);
+  if (user.role === "ADMIN") user.tier = "PRO"; // Admin luon co du tinh nang PRO
   if (updates.status === "active" || updates.status === "locked") user.status = updates.status;
   if (updates.permissions && typeof updates.permissions === "object") {
     user.permissions = { ...user.permissions, ...updates.permissions };
@@ -155,6 +180,10 @@ function verifyPassword(user, password) {
   return bcrypt.compareSync(password, user.passwordHash);
 }
 
+function isPro(user) {
+  return !!user && (user.role === "ADMIN" || user.tier === "PRO");
+}
+
 // ---------- FAVORITES ----------
 
 function listFavorites(userId) {
@@ -164,7 +193,7 @@ function listFavorites(userId) {
     .sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
 }
 
-function addFavorite(userId, { name, lat, lng, address }) {
+function addFavorite(userId, { name, lat, lng, address, category }) {
   ensureLoaded();
   const fav = {
     id: cache.nextFavId++,
@@ -173,6 +202,7 @@ function addFavorite(userId, { name, lat, lng, address }) {
     lat,
     lng,
     address: address || "",
+    category: FAVORITE_CATEGORIES.includes(category) ? category : "other",
     createdAt: nowIso()
   };
   cache.favorites.push(fav);
@@ -192,6 +222,8 @@ function removeFavorite(userId, favId) {
 
 module.exports = {
   ADMIN_USERNAME,
+  TIERS,
+  FAVORITE_CATEGORIES,
   ensureLoaded,
   listUsers,
   publicUser,
@@ -201,6 +233,7 @@ module.exports = {
   updateUser,
   deleteUser,
   verifyPassword,
+  isPro,
   listFavorites,
   addFavorite,
   removeFavorite,
