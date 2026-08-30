@@ -114,7 +114,7 @@
           <!-- CHI PRO/ADMIN: canh bao khu vuc uoc tinh dong duc -->
           <div class="congestion-banner pro-only" id="congestionBanner" style="display:none;">
             <div class="cb-head"><span id="cbIcon">⚠️</span> <span id="cbTitle">Khu vực có thể đông đúc</span></div>
-            <div class="cb-note">Ước tính theo khung giờ cao điểm — không phải dữ liệu cảm biến thời gian thực.</div>
+            <div class="cb-note" id="cbNote">Ước tính theo khung giờ cao điểm, ngày trong tuần và mật độ giao lộ trên tuyến — không phải dữ liệu cảm biến thời gian thực.</div>
           </div>
 
           <div class="route-summary" id="routeSummary">
@@ -126,6 +126,9 @@
             </div>
             <div class="nav-status" id="navStatus" style="display:none;"></div>
           </div>
+
+          <!-- Thoi tiet hien tai + du bao tai diem di va diem den -->
+          <div class="route-weather-wrap" id="routeWeatherBox" style="display:none;"></div>
 
           <!-- CHI PRO/ADMIN: danh sach cac tuyen thay the -->
           <div class="route-alternatives pro-only" id="routeAlternatives" style="display:none;"></div>

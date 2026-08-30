@@ -126,7 +126,36 @@ const MapModule = (() => {
     }
   }
 
-  // ---------------- TIM KIEM (goi y ngay khi go) ----------------
+  // ---------------- TIM KIEM (goi y ngay khi go, co icon loai dia diem + tim gan day) ----------------
+  const RECENT_SEARCH_KEY = "quantum_map_os_recent_searches";
+  const RECENT_SEARCH_MAX = 6;
+
+  function loadRecentSearches() {
+    try { return JSON.parse(localStorage.getItem(RECENT_SEARCH_KEY)) || []; }
+    catch (e) { return []; }
+  }
+  function saveRecentSearch(r) {
+    let recents = loadRecentSearches().filter(x => x.name !== r.name);
+    recents.unshift({ name: r.name, lat: r.lat, lng: r.lng });
+    recents = recents.slice(0, RECENT_SEARCH_MAX);
+    try { localStorage.setItem(RECENT_SEARCH_KEY, JSON.stringify(recents)); } catch (e) { /* bo qua neu storage day/bi chan */ }
+  }
+
+  function placeTypeIcon(cls, type) {
+    if (cls === "highway") return "🛣️";
+    if (cls === "building" || type === "house") return "🏠";
+    if (cls === "place") {
+      if (["city", "town"].includes(type)) return "🏙️";
+      if (["village", "hamlet", "suburb", "neighbourhood", "quarter"].includes(type)) return "🏘️";
+      return "📍";
+    }
+    if (cls === "shop") return "🛍️";
+    if (cls === "tourism") return "🏨";
+    if (cls === "amenity") return "📍";
+    if (cls === "natural" || cls === "leisure") return "🌳";
+    return "📍";
+  }
+
   function bindSearch() {
     const input = document.getElementById("searchInput");
     const btn = document.getElementById("searchBtn");
@@ -137,7 +166,7 @@ const MapModule = (() => {
 
     async function doSearch() {
       const q = input.value.trim();
-      if (q.length < 2) { resultsBox.style.display = "none"; return; }
+      if (q.length < 2) { renderRecents(); return; }
       if (!hasPermission("search")) return showToast("Bạn không có quyền tìm kiếm", true);
       try {
         const c = map.getCenter();
@@ -148,6 +177,24 @@ const MapModule = (() => {
       } catch (e) {
         showToast(e.message, true);
       }
+    }
+
+    function renderRecents() {
+      const recents = loadRecentSearches();
+      if (!recents.length) { resultsBox.style.display = "none"; return; }
+      lastResults = recents;
+      highlightIndex = -1;
+      resultsBox.innerHTML = `<div class="search-result-note">🕑 Tìm gần đây</div>` +
+        recents.map((r, i) => `
+          <div class="search-result-item" data-idx="${i}">
+            <b>🕑 ${escapeHtml(r.name.split(",")[0])}</b>${escapeHtml(r.name.split(",").slice(1).join(","))}
+          </div>
+        `).join("");
+      resultsBox.style.display = "block";
+      resultsBox.querySelectorAll(".search-result-item").forEach((el) => {
+        const idx = Number(el.dataset.idx);
+        el.addEventListener("click", () => selectResult(recents[idx], false));
+      });
     }
 
     function renderSearchResults(results, q, approximate) {
@@ -163,8 +210,9 @@ const MapModule = (() => {
         const parts = r.name.split(",");
         const head = parts[0];
         const rest = parts.slice(1).join(",");
+        const icon = placeTypeIcon(r.class, r.type);
         return `<div class="search-result-item" data-idx="${i}">
-          <b>${escapeHtml(head)}</b>${escapeHtml(rest)}
+          <b>${icon} ${escapeHtml(head)}</b>${escapeHtml(rest)}
         </div>`;
       }).join("");
       resultsBox.style.display = "block";
@@ -177,9 +225,13 @@ const MapModule = (() => {
     function selectResult(r, approximate) {
       resultsBox.style.display = "none";
       input.value = r.name;
+      saveRecentSearch(r);
       openPlaceDetail({ name: r.name.split(",")[0], address: r.name, lat: r.lat, lng: r.lng, isApproximate: !!approximate });
     }
 
+    input.addEventListener("focus", () => {
+      if (!input.value.trim()) renderRecents();
+    });
     input.addEventListener("input", () => {
       clearTimeout(debounceTimer);
       debounceTimer = setTimeout(doSearch, 250); // goi y gan nhu tuc thi khi go
@@ -690,10 +742,12 @@ const MapModule = (() => {
       if (!from || !to) return showToast("Vui lòng nhập hoặc chọn đầy đủ điểm đi và điểm đến", true);
 
       showToast("Đang tính toán đường đi...");
-      const localHour = new Date().getHours();
+      const now = new Date();
+      const localHour = now.getHours();
+      const isWeekend = now.getDay() === 0 || now.getDay() === 6;
       const preferParam = isPro() ? `&prefer=${currentPrefer}` : "";
       const data = await Api.get(
-        `/api/geo/route?fromLat=${from.lat}&fromLng=${from.lng}&toLat=${to.lat}&toLng=${to.lng}&mode=${currentMode}&localHour=${localHour}${preferParam}`
+        `/api/geo/route?fromLat=${from.lat}&fromLng=${from.lng}&toLat=${to.lat}&toLng=${to.lng}&mode=${currentMode}&localHour=${localHour}&isWeekend=${isWeekend}${preferParam}`
       );
 
       drawRoute(data);
@@ -705,11 +759,47 @@ const MapModule = (() => {
 
       renderCongestion(data);
       renderAlternatives(data, from, to);
+      renderRouteWeather(from, to);
 
       if (isPro()) fetchSignalsAlongRoute(data.geometry);
     } catch (e) {
       showToast(e.message, true);
     }
+  }
+
+  async function renderRouteWeather(from, to) {
+    if (!hasPermission("search")) {
+      document.getElementById("routeWeatherBox").style.display = "none";
+      return;
+    }
+    const box = document.getElementById("routeWeatherBox");
+    box.style.display = "block";
+    box.innerHTML = '<div class="hint-text">Đang tải thời tiết hai đầu tuyến...</div>';
+    try {
+      const [wFrom, wTo] = await Promise.all([
+        Api.get(`/api/geo/weather-forecast?lat=${from.lat}&lng=${from.lng}`),
+        Api.get(`/api/geo/weather-forecast?lat=${to.lat}&lng=${to.lng}`)
+      ]);
+      box.innerHTML = buildRouteWeatherCard("Điểm đi", wFrom) + buildRouteWeatherCard("Điểm đến", wTo);
+    } catch (e) {
+      box.style.display = "none";
+    }
+  }
+
+  function buildRouteWeatherCard(label, w) {
+    const c = w.current;
+    const nextRain = (w.hourly || []).find(h => h.precipProb !== null && h.precipProb >= 50);
+    const rainNote = nextRain ? `<div class="rw-rain">🌧️ Có thể mưa lúc ${nextRain.hourLabel} (${nextRain.precipProb}%)</div>` : "";
+    const todayDaily = (w.daily || [])[0];
+    const dailyNote = todayDaily ? `<div class="rw-daily">Hôm nay: ${Math.round(todayDaily.tempMinC)}°–${Math.round(todayDaily.tempMaxC)}°C</div>` : "";
+    return `
+      <div class="route-weather-card">
+        <div class="rw-label">${escapeHtml(label)}</div>
+        <div class="rw-main"><span class="rw-icon">${c.icon}</span><span class="rw-temp">${Math.round(c.tempC)}°C</span><span class="rw-desc">${escapeHtml(c.description)}</span></div>
+        ${dailyNote}
+        ${rainNote}
+      </div>
+    `;
   }
 
   function drawRoute(data) {
@@ -741,6 +831,9 @@ const MapModule = (() => {
     document.getElementById("cbTitle").textContent = data.redAlert
       ? "Cảnh báo đỏ: khu vực có thể ùn tắc nặng"
       : "Khu vực có thể hơi đông";
+    const dayLabel = data.congestion.isWeekend ? "cuối tuần" : "ngày thường";
+    document.getElementById("cbNote").textContent =
+      `Ước tính lúc ${data.congestion.hourUsed}h (${dayLabel}), mật độ giao lộ ~${data.congestion.junctionsPerKm}/km trên tuyến — không phải dữ liệu cảm biến thời gian thực.`;
     banner.style.display = "block";
   }
 

@@ -4,13 +4,15 @@
 
 ## Tính năng
 
-- 🔍 **Tìm kiếm gợi ý tức thời**: gõ tới đâu gợi ý tới đó (Nominatim - OpenStreetMap), điều hướng bằng bàn phím (↑ ↓ Enter)
+- 🔍 **Tìm kiếm gợi ý tức thời**: gõ tới đâu gợi ý tới đó (Nominatim - OpenStreetMap), có icon theo loại địa điểm (nhà/đường/thành phố...), lưu **lịch sử tìm gần đây**, điều hướng bằng bàn phím (↑ ↓ Enter)
+- 🏠 **Tìm số nhà mạnh hơn**: tự động thử nhiều chiến lược khi số nhà không có kết quả ngay (thêm ngữ cảnh quốc gia, tìm kiếm có cấu trúc, hỗ trợ định dạng hẻm/ngõ kiểu Việt Nam như "12A/3", dùng thêm nguồn dữ liệu dự phòng Photon), luôn báo rõ khi chỉ tìm được vị trí gần đúng theo tên đường
 - 📍 Định vị vị trí hiện tại (GPS trình duyệt)
 - 🧭 Tìm đường cho **4 phương tiện**: Ô tô, Xe máy (xấp xỉ theo hồ sơ ô tô), Xe đạp, Đi bộ
 - 📇 **Thẻ chi tiết địa điểm** kiểu Google Maps: ảnh minh họa thật (Wikimedia Commons), thời tiết hiện tại, địa chỉ, và các nút **Đường đi / Lưu / Gần đó / Gửi tới điện thoại (QR) / Chia sẻ**
 - 🏨 **Gợi ý địa điểm lân cận** theo danh mục (khách sạn, ăn uống, cà phê, xăng dầu, ATM, nhà thuốc...) — dữ liệu OpenStreetMap thật qua Overpass API
 - ⭐ **Yêu thích có phân loại**: Nhà / Công ty / Ăn uống / Du lịch / Mua sắm / Khác, lọc nhanh bằng chip
 - 🌦️ **Thời tiết thời gian thực** tại vị trí trung tâm bản đồ và tại từng địa điểm (Open-Meteo — miễn phí, không cần khóa API)
+- ⛅ **Dự báo thời tiết tại cả điểm đi và điểm đến** khi tìm đường: nhiệt độ hiện tại, nhiệt độ cao/thấp trong ngày, và cảnh báo nếu có khả năng mưa trong vài giờ tới
 - 🚦 Hiển thị **đèn giao thông** thật trên tuyến đường (dữ liệu OpenStreetMap)
 - ⚠️ **Cảnh báo khu vực có thể đông đúc** theo khung giờ cao điểm — xem mục "Minh bạch dữ liệu" bên dưới
 - ▶️ **Điều hướng trực tiếp**: bấm "Bắt đầu" để liên tục cập nhật vị trí của bạn trên bản đồ và khoảng cách còn lại theo thời gian thực
@@ -48,7 +50,7 @@ Khi mở chi tiết một địa điểm, ứng dụng tự động hiển thị
 
 Ứng dụng này dùng **100% dịch vụ bản đồ miễn phí, không cần khóa API trả phí**. Điều đó có nghĩa một số tính năng là **ước tính hoặc xấp xỉ** thay vì dữ liệu cảm biến thời gian thực thật — đội ngũ phát triển cam kết không bịa số liệu:
 
-- **"Khu vực có thể đông đúc" / cảnh báo đỏ (PRO)**: đây là **ước tính dựa trên khung giờ cao điểm** (giờ đi làm 7–9h, 17–19h) kết hợp độ dài quãng đường, **không phải dữ liệu cảm biến giao thông thời gian thực**. Muốn có dữ liệu tắc đường thời gian thực thật (như Google Maps), cần tích hợp API trả phí (Google Maps Platform, TomTom, HERE...).
+- **"Khu vực có thể đông đúc" / cảnh báo đỏ (PRO)**: đây là **ước tính** kết hợp 3 yếu tố miễn phí có sẵn — khung giờ cao điểm (7–9h, 17–19h ngày thường), ngày trong tuần (cuối tuần thường đỡ tắc hơn), và **mật độ giao lộ trên tuyến** (số khúc rẽ/giao lộ mỗi km — đường nội thành nhiều giao lộ thường dễ tắc hơn đường thẳng một mạch). Đây **không phải dữ liệu cảm biến giao thông thời gian thực**. Muốn có dữ liệu tắc đường thời gian thực chính xác thật (như Google Maps dùng dữ liệu vị trí ẩn danh từ hàng triệu điện thoại), bắt buộc phải tích hợp API trả phí (Google Maps Platform, TomTom Traffic, HERE Traffic...) — đây là giới hạn kỹ thuật thực sự của mọi giải pháp miễn phí, không riêng gì ứng dụng này.
 - **Tuyến đường xe máy**: chưa có máy chủ chỉ đường miễn phí công khai dành riêng cho xe máy, nên hệ thống **xấp xỉ bằng hồ sơ định tuyến ô tô** — ứng dụng luôn hiển thị rõ lưu ý này trong giao diện.
 - **Đèn giao thông & cảnh báo công trình**: là dữ liệu **thật** từ cộng đồng OpenStreetMap (Overpass API), nhưng có thể **không đầy đủ 100%** tùy khu vực đã được người dùng OSM cập nhật hay chưa.
 - **Ảnh địa điểm**: lấy thật từ Wikimedia Commons theo tên địa điểm — chỉ hiển thị khi tìm thấy ảnh phù hợp; không phải mọi địa chỉ đều có ảnh (khác với Google Street View, vốn cần hợp đồng trả phí).

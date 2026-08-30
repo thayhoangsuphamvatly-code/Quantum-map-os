@@ -45,15 +45,65 @@ async function callNominatim(params) {
     lat: parseFloat(item.lat),
     lng: parseFloat(item.lon),
     type: item.type,
-    boundingbox: item.boundingbox
+    class: item.class,
+    boundingbox: item.boundingbox,
+    source: "nominatim"
   }));
 }
 
-// Nhan dien cau truy van dang "<so nha> <ten duong...>" (vi du "194 Lac Trung")
+// Nguon du lieu du phong thu hai (Photon/Komoot - mien phi, khong can API key).
+// Photon lap chi muc du lieu OSM theo cach khac Nominatim nen doi khi tim thay
+// dia chi co so nha ma Nominatim bo sot, dac biet o Viet Nam.
+async function callPhoton(query) {
+  const url = `https://photon.komoot.io/api/?q=${encodeURIComponent(query)}&lang=vi&limit=6`;
+  const resp = await fetch(url, { headers: { "User-Agent": APP_USER_AGENT } });
+  if (!resp.ok) throw new Error("Dich vu tim kiem du phong dang gap su co");
+  const data = await resp.json();
+  return (data.features || []).map((f, i) => {
+    const p = f.properties || {};
+    const nameParts = [
+      p.housenumber && p.street ? `${p.housenumber} ${p.street}` : (p.name || p.street),
+      p.district, p.city, p.state, p.country
+    ].filter(Boolean);
+    return {
+      id: `photon-${i}-${f.geometry.coordinates[1]}`,
+      name: [...new Set(nameParts)].join(", "),
+      lat: f.geometry.coordinates[1],
+      lng: f.geometry.coordinates[0],
+      type: p.osm_value || p.type,
+      class: p.osm_key,
+      source: "photon"
+    };
+  });
+}
+
+// Nhan dien cau truy van dang "<so nha> <ten duong...>" (vi du "194 Lac Trung",
+// "12A/3 Lac Trung", "45/7B Nguyen Trai" - ho tro ca dinh dang ngo/hem kieu VN)
 // de co the thu lai bang truong "street" chuyen dung cua Nominatim khi tim kiem
 // tu do (free-form) khong ra ket qua - Nominatim lap chi muc so nha o Viet Nam
 // khong day du nen can nhieu chien luoc thu lai.
-const HOUSE_NUMBER_PATTERN = /^(\d+[a-zA-ZÀ-ỹ]{0,3})[\s,]+(.+)$/u;
+const HOUSE_NUMBER_PATTERN = /^(\d+[a-zA-ZÀ-ỹ]{0,2}(?:[\/\-]\d+[a-zA-ZÀ-ỹ]{0,2})*)[\s,]+(.+)$/u;
+
+// Cache ngan han cho ket qua tim kiem: go gon tra loi khi nguoi dung go/xoa
+// nhanh cac tu khoa giong nhau (vi du go roi backspace roi go lai), giup goi y
+// hien ra nhanh hon va giam so lan goi dich vu ben ngoai mien phi.
+const SEARCH_CACHE = new Map();
+const SEARCH_CACHE_TTL_MS = 25000;
+const SEARCH_CACHE_MAX = 80;
+
+function getSearchCache(key) {
+  const entry = SEARCH_CACHE.get(key);
+  if (!entry) return null;
+  if (Date.now() - entry.time > SEARCH_CACHE_TTL_MS) { SEARCH_CACHE.delete(key); return null; }
+  return entry.payload;
+}
+function setSearchCache(key, payload) {
+  if (SEARCH_CACHE.size >= SEARCH_CACHE_MAX) {
+    const oldestKey = SEARCH_CACHE.keys().next().value;
+    SEARCH_CACHE.delete(oldestKey);
+  }
+  SEARCH_CACHE.set(key, { time: Date.now(), payload });
+}
 
 router.get("/search", requirePermission("search"), async (req, res) => {
   const q = (req.query.q || "").toString().trim();
@@ -63,6 +113,10 @@ router.get("/search", requirePermission("search"), async (req, res) => {
   const nearLat = parseFloat(req.query.nearLat);
   const nearLng = parseFloat(req.query.nearLng);
   const hasBias = Number.isFinite(nearLat) && Number.isFinite(nearLng);
+
+  const cacheKey = `${q.toLowerCase()}|${hasBias ? `${nearLat.toFixed(2)},${nearLng.toFixed(2)}` : ""}`;
+  const cached = getSearchCache(cacheKey);
+  if (cached) return res.json(cached);
 
   function baseParams(query) {
     const p = new URLSearchParams({ format: "jsonv2", addressdetails: "1", limit: "8", q: query });
@@ -87,36 +141,42 @@ router.get("/search", requirePermission("search"), async (req, res) => {
     // Chien luoc 3: neu van khong co, va cau truy van dang "<so nha> <duong...>",
     // thu lai bang tim kiem co cau truc (structured search) voi truong "street"
     // chuyen dung cho so nha + ten duong - chinh xac hon doi voi dia chi VN
-    if (!results.length) {
-      const m = q.match(HOUSE_NUMBER_PATTERN);
-      if (m) {
-        const structured = new URLSearchParams({
-          format: "jsonv2", addressdetails: "1", limit: "8",
-          street: q, country: "Việt Nam"
-        });
-        if (hasBias) {
-          const d = 0.25;
-          structured.set("viewbox", `${nearLng - d},${nearLat + d},${nearLng + d},${nearLat - d}`);
-          structured.set("bounded", "0");
-        }
-        results = await callNominatim(structured);
+    const houseMatch = q.match(HOUSE_NUMBER_PATTERN);
+    if (!results.length && houseMatch) {
+      const structured = new URLSearchParams({
+        format: "jsonv2", addressdetails: "1", limit: "8",
+        street: q, country: "Việt Nam"
+      });
+      if (hasBias) {
+        const d = 0.25;
+        structured.set("viewbox", `${nearLng - d},${nearLat + d},${nearLng + d},${nearLat - d}`);
+        structured.set("bounded", "0");
       }
+      results = await callNominatim(structured);
     }
 
-    // Chien luoc 4: van khong co ket qua va co so nha - thu tim rieng TEN DUONG
+    // Chien luoc 4: thu nguon du phong Photon (lap chi muc khac Nominatim,
+    // doi khi tim thay dia chi co so nha ma Nominatim khong co)
+    if (!results.length) {
+      try {
+        const photonResults = await callPhoton(houseMatch ? q : `${q}, Việt Nam`);
+        if (photonResults.length) results = photonResults;
+      } catch (e) { /* Photon la nguon du phong - im lang neu loi, chuyen chien luoc tiep theo */ }
+    }
+
+    // Chien luoc 5: van khong co ket qua va co so nha - thu tim rieng TEN DUONG
     // (bo so nha) de it nhat dua nguoi dung den dung con duong, kem ghi chu ro
     // rang chi tim thay ten duong chu khong chinh xac so nha
     let approximate = false;
-    if (!results.length) {
-      const m = q.match(HOUSE_NUMBER_PATTERN);
-      if (m) {
-        const streetOnly = m[2];
-        results = await callNominatim(baseParams(hasBias ? streetOnly : `${streetOnly}, Việt Nam`));
-        if (results.length) approximate = true;
-      }
+    if (!results.length && houseMatch) {
+      const streetOnly = houseMatch[2];
+      results = await callNominatim(baseParams(hasBias ? streetOnly : `${streetOnly}, Việt Nam`));
+      if (results.length) approximate = true;
     }
 
-    res.json({ results, approximate });
+    const payload = { results, approximate };
+    setSearchCache(cacheKey, payload);
+    res.json(payload);
   } catch (e) {
     res.status(502).json({ error: "Khong the ket noi dich vu tim kiem dia diem: " + e.message });
   }
@@ -190,6 +250,73 @@ router.get("/weather", requirePermission("search"), async (req, res) => {
     });
   } catch (e) {
     res.status(502).json({ error: "Không thể lấy dữ liệu thời tiết: " + e.message });
+  }
+});
+
+// Thoi tiet hien tai + du bao gio toi + du bao vai ngay toi - dung de hien thi
+// thoi tiet tai CA diem di lan diem den khi tim duong (Open-Meteo, mien phi).
+router.get("/weather-forecast", requirePermission("search"), async (req, res) => {
+  const { lat, lng } = req.query;
+  if (!lat || !lng) return res.status(400).json({ error: "Thieu toa do" });
+  try {
+    const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lng}` +
+      `&current=temperature_2m,weather_code,is_day` +
+      `&hourly=temperature_2m,weather_code,precipitation_probability` +
+      `&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max` +
+      `&timezone=auto&forecast_days=3`;
+    const resp = await fetch(url);
+    if (!resp.ok) throw new Error("Dich vu thoi tiet dang gap su co");
+    const data = await resp.json();
+
+    const cur = data.current || {};
+    const curInfo = WEATHER_CODE_MAP[cur.weather_code] || { desc: "Không rõ", icon: "🌡️" };
+
+    // Lay 6 moc gio tiep theo tinh tu thoi diem hien tai trong du lieu hourly.
+    // So sanh theo Date thay vi so khop chuoi tuyet doi de tranh lech dinh dang.
+    const hourly = data.hourly || {};
+    const times = hourly.time || [];
+    const nowTime = cur.time ? new Date(cur.time).getTime() : Date.now();
+    let startIdx = times.findIndex(t => new Date(t).getTime() >= nowTime);
+    if (startIdx === -1) startIdx = 0;
+    const hourlyForecast = times.slice(startIdx, startIdx + 6).map((t, i) => {
+      const idx = startIdx + i;
+      const info = WEATHER_CODE_MAP[hourly.weather_code[idx]] || { desc: "Không rõ", icon: "🌡️" };
+      return {
+        time: t,
+        hourLabel: t.split("T")[1]?.slice(0, 5) || "",
+        tempC: hourly.temperature_2m[idx],
+        precipProb: hourly.precipitation_probability ? hourly.precipitation_probability[idx] : null,
+        icon: info.icon,
+        description: info.desc
+      };
+    });
+
+    const daily = data.daily || {};
+    const dailyForecast = (daily.time || []).map((d, idx) => {
+      const info = WEATHER_CODE_MAP[daily.weather_code[idx]] || { desc: "Không rõ", icon: "🌡️" };
+      return {
+        date: d,
+        tempMaxC: daily.temperature_2m_max[idx],
+        tempMinC: daily.temperature_2m_min[idx],
+        precipProbMax: daily.precipitation_probability_max ? daily.precipitation_probability_max[idx] : null,
+        icon: info.icon,
+        description: info.desc
+      };
+    });
+
+    res.json({
+      current: {
+        tempC: cur.temperature_2m,
+        isDay: cur.is_day === 1,
+        description: curInfo.desc,
+        icon: curInfo.icon,
+        time: cur.time
+      },
+      hourly: hourlyForecast,
+      daily: dailyForecast
+    });
+  } catch (e) {
+    res.status(502).json({ error: "Không thể lấy dữ liệu dự báo thời tiết: " + e.message });
   }
 });
 
@@ -325,23 +452,45 @@ router.get("/signals", requirePro, async (req, res) => {
 // TIM DUONG (nhieu phuong tien; PRO co nhieu lua chon tuyen + uoc tinh dong duc)
 // ============================================================
 
-function estimateCongestion(distanceMeters, localHour) {
+// UOC TINH muc do dong duc - KHONG PHAI du lieu cam bien giao thong thoi gian
+// thuc (dieu do can dich vu tra phi nhu Google/TomTom/HERE Traffic). Ket hop 3
+// yeu to co san mien phi de uoc tinh hop ly hon:
+//   1) Khung gio cao diem (7-9h, 17-19h di lam/tan tam)
+//   2) Ngay trong tuan (thap hon vao cuoi tuan)
+//   3) Mat do giao lo tren tuyen (so buoc re/giao lo tren moi km - duong noi
+//      thanh nhieu giao lo thuong de tac hon duong thang mot mach)
+function estimateCongestion(distanceMeters, stepCount, localHour, isWeekend) {
   const hour = Number.isInteger(localHour) ? localHour : new Date().getHours();
-  const isRush = (hour >= 7 && hour <= 9) || (hour >= 17 && hour <= 19);
-  const isShoulder = (hour >= 9 && hour <= 11) || (hour >= 15 && hour <= 17) || (hour >= 19 && hour <= 20);
+  const weekend = !!isWeekend;
+  const km = Math.max(distanceMeters / 1000, 0.1);
+  const junctionsPerKm = stepCount / km;
+
+  const isRush = !weekend && ((hour >= 7 && hour <= 9) || (hour >= 17 && hour <= 19));
+  const isShoulder = (hour >= 9 && hour <= 11) || (hour >= 15 && hour <= 17) || (hour >= 19 && hour <= 20) || (weekend && hour >= 17 && hour <= 21);
+  const denseRoad = junctionsPerKm >= 6; // nhieu giao lo/khuc re tren moi km
+
+  let score = 0;
+  if (isRush) score += 2;
+  else if (isShoulder) score += 1;
+  if (denseRoad) score += 1;
+  if (km > 5) score += 1; // quang duong dai hon co xac suat gap doan dong hon
+
   let level = "low";
-  if (isRush && distanceMeters > 1500) level = "high";
-  else if (isRush || (isShoulder && distanceMeters > 3000)) level = "medium";
+  if (score >= 3) level = "high";
+  else if (score >= 2) level = "medium";
+
   return {
     level,
     hourUsed: hour,
+    isWeekend: weekend,
+    junctionsPerKm: Math.round(junctionsPerKm * 10) / 10,
     isEstimate: true,
-    note: "Đây là ƯỚC TÍNH dựa trên khung giờ cao điểm, không phải dữ liệu cảm biến giao thông thời gian thực."
+    note: "Đây là ƯỚC TÍNH kết hợp khung giờ cao điểm, ngày trong tuần và mật độ giao lộ trên tuyến — KHÔNG PHẢI dữ liệu cảm biến giao thông thời gian thực (cần dịch vụ trả phí như Google/TomTom/HERE Traffic để có độ chính xác đó)."
   };
 }
 
 router.get("/route", requirePermission("route"), async (req, res) => {
-  const { fromLat, fromLng, toLat, toLng, mode, prefer, localHour } = req.query;
+  const { fromLat, fromLng, toLat, toLng, mode, prefer, localHour, isWeekend } = req.query;
   if (!fromLat || !fromLng || !toLat || !toLng) {
     return res.status(400).json({ error: "Thieu toa do diem di / diem den" });
   }
@@ -388,7 +537,12 @@ router.get("/route", requirePermission("route"), async (req, res) => {
     };
 
     if (userIsPro) {
-      responseBody.congestion = estimateCongestion(chosen.distanceMeters, localHour ? Number(localHour) : undefined);
+      responseBody.congestion = estimateCongestion(
+        chosen.distanceMeters,
+        chosen.steps.length,
+        localHour ? Number(localHour) : undefined,
+        isWeekend === "true"
+      );
       responseBody.redAlert = responseBody.congestion.level === "high";
       if (wantAlternatives && routes.length > 1) {
         responseBody.alternatives = byFastest.slice(0, 3).map(r => ({
