@@ -1,4 +1,4 @@
-# MapViet Neon 🛰️
+# Quantum Map OS 🛰️
 
 Ứng dụng bản đồ kiểu Google Maps, giao diện **neon tối**, dùng **Leaflet** (OpenStreetMap) cho phần bản đồ, có **backend + frontend** đầy đủ, **3 hạng tài khoản** (Admin / Pro / Thường), và **cài đặt được như một ứng dụng thật (PWA)** trên cả điện thoại lẫn máy tính.
 
@@ -14,13 +14,13 @@
 - 🚦 Hiển thị **đèn giao thông** thật trên tuyến đường (dữ liệu OpenStreetMap)
 - ⚠️ **Cảnh báo khu vực có thể đông đúc** theo khung giờ cao điểm — xem mục "Minh bạch dữ liệu" bên dưới
 - ▶️ **Điều hướng trực tiếp**: bấm "Bắt đầu" để liên tục cập nhật vị trí của bạn trên bản đồ và khoảng cách còn lại theo thời gian thực
-- ⬇️ **Tải Ứng Dụng**: cài MapViet Neon như một ứng dụng thật (PWA) trên cả điện thoại và máy tính, có icon riêng, mở toàn màn hình không cần trình duyệt
+- ⬇️ **Tải Ứng Dụng**: cài Quantum Map OS như một ứng dụng thật (PWA) trên cả điện thoại và máy tính, có icon riêng, mở toàn màn hình không cần trình duyệt
 - 🔐 Đăng nhập bằng JWT, **không có trang đăng ký** — chỉ Admin được tạo tài khoản
 - 🛡️ Trang **Quản Lý Tài Khoản** (chỉ Admin thấy được): tạo/sửa/khóa/xóa tài khoản, đổi vai trò, đổi **hạng tài khoản**, và bật/tắt từng quyền tính năng
 - 📱 Giao diện **responsive** thật sự: trên máy tính panel Tìm đường/Yêu thích/Chi tiết địa điểm **neo cạnh bản đồ** (không đè lên), trên điện thoại có thanh điều hướng dưới cùng + bottom-sheet giống app bản đồ di động
 - 🎨 Giao diện neon tối: nền chòm sao chuyển động, viền phát sáng, gradient cyan/tím/hồng
 
-## 3 hạng tài khoản
+## 3 hạng tài khoản (+ cờ Doanh nghiệp độc lập)
 
 | Hạng | Quyền hạn |
 |---|---|
@@ -29,6 +29,20 @@
 | **STANDARD (Thường)** | Tìm đường cơ bản — một tuyến duy nhất, giống bản Google Maps thông thường, không có các cảnh báo nâng cao |
 
 Cả 3 hạng đều có thể bị Admin **giới hạn thêm** từng tính năng riêng lẻ (tìm kiếm / tìm đường / định vị / yêu thích) độc lập với hạng tài khoản.
+
+**Tài khoản Doanh nghiệp** là một **cờ (flag) độc lập** (`isBusiness`) mà Admin có thể bật cho bất kỳ tài khoản STANDARD hay PRO nào — không phải hạng thứ 4. Tài khoản có cờ này được vào mục **"Quảng Cáo Của Tôi"** để gắn **một địa điểm quảng cáo** (tên, danh mục, mô tả, số điện thoại, vị trí trên bản đồ). Địa điểm này:
+
+- Hiển thị **công khai trên bản đồ cho mọi người dùng** với marker vàng riêng biệt (🏷️)
+- **Luôn có nhãn "🏷️ QUẢNG CÁO"** rõ ràng ở mọi nơi nó xuất hiện (trên bản đồ, trong thẻ chi tiết địa điểm, trong mục "Được quảng cáo gần đây") — **không bao giờ trộn lẫn** với kết quả tìm kiếm/gợi ý tự nhiên, để đảm bảo minh bạch với người dùng
+- Admin có trang **kiểm duyệt quảng cáo** riêng (trong Quản Lý Tài Khoản) để gỡ bỏ bất kỳ địa điểm quảng cáo nào vi phạm
+- Giới hạn 1 địa điểm/tài khoản doanh nghiệp trong phiên bản này (có thể mở rộng sau trong `src/store.js`, hằng số `MAX_LISTINGS_PER_BUSINESS`)
+
+## Giới thiệu khu vực
+
+Khi mở chi tiết một địa điểm, ứng dụng tự động hiển thị mục **"Giới thiệu khu vực"** gồm:
+
+- Đoạn tóm tắt **thật từ Wikipedia tiếng Việt** (nếu địa danh có bài viết tương ứng — ví dụ tên tỉnh/thành, phường/xã, địa danh nổi tiếng), kèm liên kết "Theo Wikipedia →" dẫn tới bài viết gốc
+- Thống kê **tiện ích thật xung quanh** trong bán kính 1.5km, lấy từ dữ liệu OpenStreetMap (Overpass API): số trường học, cơ sở y tế, quán ăn, chợ/siêu thị, ngân hàng/ATM, nhà thuốc, công viên — không bịa số liệu, chỉ đếm những gì cộng đồng OSM đã gắn thẻ
 
 ## ⚠️ Minh bạch dữ liệu (quan trọng, xin đọc kỹ)
 
@@ -64,7 +78,7 @@ Yêu cầu: đã cài **Node.js phiên bản 18 trở lên** (có sẵn `fetch`)
 
 ```bash
 # 1. Giải nén / vào thư mục dự án
-cd mapviet
+cd quantum-map-os
 
 # 2. Cài thư viện backend
 npm install
@@ -85,13 +99,13 @@ Dự án đã có sẵn file **`render.yaml`** (Render Blueprint) để deploy c
 
 **Bước 1 — Đẩy code lên Git**
 
-Tạo một repo (GitHub/GitLab) và đẩy **toàn bộ nội dung thư mục `mapviet`** (bao gồm `server.js`, `package.json`, `src/`, `public/`, `render.yaml`) lên làm gốc repo đó. Không cần đẩy `node_modules/` hay `data/db.json` (đã có trong `.gitignore`).
+Tạo một repo (GitHub/GitLab) và đẩy **toàn bộ nội dung thư mục `quantum-map-os`** (bao gồm `server.js`, `package.json`, `src/`, `public/`, `render.yaml`) lên làm gốc repo đó. Không cần đẩy `node_modules/` hay `data/db.json` (đã có trong `.gitignore`).
 
 ```bash
-cd mapviet
+cd quantum-map-os
 git init
 git add .
-git commit -m "MapViet Neon"
+git commit -m "Quantum Map OS"
 git branch -M main
 git remote add origin <URL_repo_cua_ban>
 git push -u origin main
@@ -102,9 +116,9 @@ git push -u origin main
 1. Đăng nhập [render.com](https://render.com) → **New** → **Blueprint**.
 2. Chọn repo vừa đẩy lên. Render sẽ tự phát hiện `render.yaml`.
 3. Bấm **Apply** — Render tự động: cài `npm install`, chạy `npm start`, tạo ổ đĩa lưu trữ bền vững (`disk`) cho thư mục `data/` để **dữ liệu tài khoản/yêu thích không bị mất mỗi lần deploy lại**, và tự sinh `JWT_SECRET` ngẫu nhiên an toàn.
-4. Chờ build xong, mở đường dẫn dạng `https://mapviet-neon.onrender.com`.
+4. Chờ build xong, mở đường dẫn dạng `https://quantum-map-os.onrender.com`.
 
-**Nếu để trong monorepo** (thư mục `mapviet` nằm trong một repo lớn hơn): vào phần cấu hình service trên Render → **Settings → Root Directory** → nhập `mapviet`.
+**Nếu để trong monorepo** (thư mục `quantum-map-os` nằm trong một repo lớn hơn): vào phần cấu hình service trên Render → **Settings → Root Directory** → nhập `quantum-map-os`.
 
 **Lưu ý gói Free**: service sẽ tự "ngủ" sau khoảng 15 phút không có ai truy cập, và mất khoảng 30–60 giây để "thức dậy" ở lượt truy cập kế tiếp. Đây là giới hạn của gói miễn phí Render, không phải lỗi ứng dụng.
 
@@ -118,7 +132,7 @@ git push -u origin main
 ## Cấu trúc thư mục
 
 ```
-mapviet/
+quantum-map-os/
   server.js              # Điểm khởi động Express
   src/
     store.js              # "Database" JSON: users (role+tier+permissions), favorites (có category)

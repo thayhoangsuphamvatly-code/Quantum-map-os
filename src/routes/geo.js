@@ -15,7 +15,7 @@ const { authenticate, requirePermission, requirePro } = require("../middleware")
 
 const NOMINATIM_BASE = "https://nominatim.openstreetmap.org";
 const OVERPASS_BASE = "https://overpass-api.de/api/interpreter";
-const APP_USER_AGENT = "MapViet-Neon/1.0 (ung dung hoc tap, lien he qua admin)";
+const APP_USER_AGENT = "QuantumMapOS/1.0 (ung dung hoc tap, lien he qua admin)";
 
 // Cau hinh may chu dinh tuyen mien phi cho tung phuong tien.
 // "motorbike" dung tam profile "driving" vi khong co may chu OSRM mien phi
@@ -336,6 +336,82 @@ router.get("/route", requirePermission("route"), async (req, res) => {
   } catch (e) {
     res.status(502).json({ error: "Khong the tinh toan duong di: " + e.message });
   }
+});
+
+// ============================================================
+// GIOI THIEU KHU VUC (Wikipedia that + thong ke POI that tu OSM)
+// ============================================================
+
+const AREA_STAT_CATEGORIES = [
+  { key: "school", label: "Trường học", icon: "🏫", match: t => ["school", "university", "kindergarten"].includes(t.amenity) },
+  { key: "hospital", label: "Y tế", icon: "🏥", match: t => ["hospital", "clinic"].includes(t.amenity) },
+  { key: "food", label: "Ăn uống", icon: "🍜", match: t => ["restaurant", "cafe", "fast_food"].includes(t.amenity) },
+  { key: "market", label: "Chợ / Siêu thị", icon: "🛒", match: t => t.shop === "supermarket" || t.shop === "convenience" || t.amenity === "marketplace" },
+  { key: "bank", label: "Ngân hàng / ATM", icon: "🏧", match: t => ["bank", "atm"].includes(t.amenity) },
+  { key: "pharmacy", label: "Nhà thuốc", icon: "💊", match: t => t.amenity === "pharmacy" },
+  { key: "park", label: "Công viên", icon: "🌳", match: t => t.leisure === "park" }
+];
+
+router.get("/area-info", requirePermission("search"), async (req, res) => {
+  const { lat, lng, query } = req.query;
+  if (!lat || !lng) return res.status(400).json({ error: "Thieu toa do" });
+
+  const result = { wiki: null, stats: [], radiusMeters: 1500 };
+
+  // 1) Gioi thieu tu Wikipedia tieng Viet (that, co dan nguon) - chi ap dung
+  // tot cho ten dia danh/khu vuc (thanh pho, tinh, phuong...), khong phai
+  // moi dia chi cu the deu co bai viet rieng.
+  if (query) {
+    try {
+      const searchUrl = `https://vi.wikipedia.org/w/api.php?action=opensearch&search=${encodeURIComponent(query)}&limit=1&namespace=0&format=json`;
+      const searchResp = await fetch(searchUrl, { headers: { "User-Agent": APP_USER_AGENT } });
+      const searchData = await searchResp.json();
+      const title = searchData[1] && searchData[1][0];
+      if (title) {
+        const sumResp = await fetch(`https://vi.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(title)}`, {
+          headers: { "User-Agent": APP_USER_AGENT }
+        });
+        if (sumResp.ok) {
+          const sumData = await sumResp.json();
+          if (sumData.extract && sumData.type !== "disambiguation") {
+            result.wiki = {
+              title: sumData.title,
+              extract: sumData.extract,
+              url: (sumData.content_urls && sumData.content_urls.desktop && sumData.content_urls.desktop.page) || null
+            };
+          }
+        }
+      }
+    } catch (e) { /* gioi thieu Wikipedia chi la thong tin bo sung - im lang neu loi */ }
+  }
+
+  // 2) Thong ke tien ich xung quanh - du lieu OpenStreetMap that qua Overpass
+  try {
+    const radius = result.radiusMeters;
+    const q = `[out:json][timeout:20];(node["amenity"~"school|university|kindergarten|hospital|clinic|restaurant|cafe|fast_food|marketplace|bank|atm|pharmacy"](around:${radius},${lat},${lng});node["shop"~"supermarket|convenience"](around:${radius},${lat},${lng});way["leisure"="park"](around:${radius},${lat},${lng}););out center 200;`;
+    const resp = await fetch(OVERPASS_BASE, {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: "data=" + encodeURIComponent(q)
+    });
+    if (resp.ok) {
+      const data = await resp.json();
+      const buckets = {};
+      AREA_STAT_CATEGORIES.forEach(c => { buckets[c.key] = { count: 0, samples: [] }; });
+      (data.elements || []).forEach(el => {
+        const tags = el.tags || {};
+        const cat = AREA_STAT_CATEGORIES.find(c => c.match(tags));
+        if (!cat) return;
+        buckets[cat.key].count++;
+        if (tags.name && buckets[cat.key].samples.length < 3) buckets[cat.key].samples.push(tags.name);
+      });
+      result.stats = AREA_STAT_CATEGORIES
+        .map(c => ({ key: c.key, label: c.label, icon: c.icon, count: buckets[c.key].count, samples: buckets[c.key].samples }))
+        .filter(s => s.count > 0);
+    }
+  } catch (e) { /* thong ke chi la thong tin bo sung - im lang neu loi */ }
+
+  res.json(result);
 });
 
 module.exports = router;

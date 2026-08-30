@@ -48,6 +48,10 @@ function applyPermissionsToUi() {
 
   document.getElementById("navAdmin").style.display = isAdmin ? "flex" : "none";
   document.getElementById("navAdminMobile").style.display = isAdmin ? "flex" : "none";
+
+  const isBusiness = isAdmin || AppState.user.isBusiness;
+  document.getElementById("navBusiness").style.display = isBusiness ? "flex" : "none";
+  document.getElementById("navBusinessMobile").style.display = isBusiness ? "flex" : "none";
 }
 
 function switchView(view) {
@@ -64,7 +68,10 @@ function switchView(view) {
 
   if (view === "admin") {
     adminView.classList.add("open");
-    if (window.AdminModule) window.AdminModule.loadUsers();
+    if (window.AdminModule) {
+      window.AdminModule.loadUsers();
+      window.AdminModule.loadBusiness();
+    }
     return;
   }
   adminView.classList.remove("open");
@@ -72,6 +79,18 @@ function switchView(view) {
   document.getElementById("routePanel").classList.remove("open");
   document.getElementById("favPanel").classList.remove("open");
   document.getElementById("placePanel").classList.remove("open");
+  document.getElementById("businessPanel").classList.remove("open");
+
+  if (view === "business") {
+    if (!AppState.user.isBusiness && AppState.user.role !== "ADMIN") {
+      showToast("Tính năng này dành riêng cho tài khoản Doanh nghiệp", true);
+      return;
+    }
+    document.getElementById("businessPanel").classList.add("open");
+    if (window.MapModule) window.MapModule.loadMyBusiness();
+    setTimeout(() => { if (window.MapModule) window.MapModule.invalidateSize(); }, 60);
+    return;
+  }
 
   if (view === "route") {
     if (!AppState.user.permissions.route && AppState.user.role !== "ADMIN") {
@@ -139,6 +158,7 @@ function initNav() {
     if (e.target === moreOverlay) moreOverlay.classList.remove("open");
   });
   document.getElementById("navAdminMobile").addEventListener("click", () => switchView("admin"));
+  document.getElementById("navBusinessMobile").addEventListener("click", () => switchView("business"));
 
   // Nut "Tai ung dung" (PWA that su - cai duoc ca may tinh lan dien thoai)
   document.getElementById("installBtnDesktop").addEventListener("click", handleInstallClick);
@@ -148,11 +168,11 @@ function initNav() {
 async function handleInstallClick() {
   if (!window.PwaInstall) return showToast("Không thể tải trình cài đặt ứng dụng", true);
   if (PwaInstall.isStandalone()) {
-    return showToast("Bạn đang dùng MapViet Neon ở chế độ ứng dụng rồi 🎉");
+    return showToast("Bạn đang dùng Quantum Map OS ở chế độ ứng dụng rồi 🎉");
   }
   if (PwaInstall.hasPrompt()) {
     const outcome = await PwaInstall.promptInstall();
-    if (outcome === "accepted") showToast("Đang cài đặt MapViet Neon...");
+    if (outcome === "accepted") showToast("Đang cài đặt Quantum Map OS...");
     return;
   }
   if (PwaInstall.isIos()) {

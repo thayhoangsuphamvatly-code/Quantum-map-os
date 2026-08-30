@@ -47,4 +47,10 @@ function requirePro(req, res, next) {
   return res.status(403).json({ error: "Tinh nang nay danh rieng cho tai khoan PRO. Vui long nang cap len PRO de su dung." });
 }
 
-module.exports = { authenticate, requireAdmin, requirePermission, requirePro };
+// Chi tai khoan Doanh nghiep hoac ADMIN moi duoc dung: gan/quan ly dia diem quang cao
+function requireBusiness(req, res, next) {
+  if (req.user.role === "ADMIN" || req.user.isBusiness) return next();
+  return res.status(403).json({ error: "Tính năng này danh riêng cho tài khoản Doanh nghiệp." });
+}
+
+module.exports = { authenticate, requireAdmin, requirePermission, requirePro, requireBusiness };

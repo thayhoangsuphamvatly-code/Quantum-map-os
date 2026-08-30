@@ -7,6 +7,7 @@ const authRoutes = require("./src/routes/auth");
 const adminRoutes = require("./src/routes/admin");
 const favoriteRoutes = require("./src/routes/favorites");
 const geoRoutes = require("./src/routes/geo");
+const businessRoutes = require("./src/routes/business");
 const store = require("./src/store");
 
 const app = express();
@@ -22,6 +23,7 @@ app.use("/api/auth", authRoutes);
 app.use("/api/admin", adminRoutes);
 app.use("/api/favorites", favoriteRoutes);
 app.use("/api/geo", geoRoutes);
+app.use("/api/business", businessRoutes);
 
 app.get("/api/health", (req, res) => res.json({ ok: true, time: new Date().toISOString() }));
 
@@ -34,7 +36,7 @@ app.get("*", (req, res) => {
 });
 
 app.listen(PORT, () => {
-  console.log(`\n=== MapViet Neon dang chay tai http://localhost:${PORT} ===`);
+  console.log(`\n=== Quantum Map OS dang chay tai http://localhost:${PORT} ===`);
   console.log(`Tai khoan Admin mac dinh: ${store.ADMIN_USERNAME}`);
   console.log(`(Mat khau da duoc thiet lap san theo yeu cau cua ban)\n`);
 });

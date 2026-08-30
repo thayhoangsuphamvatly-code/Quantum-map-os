@@ -2,7 +2,7 @@
 const jwt = require("jsonwebtoken");
 
 // Trong san pham that, hay dat bien moi truong JWT_SECRET rieng va bao mat.
-const JWT_SECRET = process.env.JWT_SECRET || "mapviet-neon-secret-doi-key-nay-khi-trien-khai-that";
+const JWT_SECRET = process.env.JWT_SECRET || "quantum-map-os-secret-doi-key-nay-khi-trien-khai-that";
 const TOKEN_TTL = "12h";
 
 function signToken(user) {

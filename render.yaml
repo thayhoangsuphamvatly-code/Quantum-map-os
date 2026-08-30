@@ -1,14 +1,14 @@
-# render.yaml — Blueprint để deploy MapViet Neon lên Render.com
+# render.yaml — Blueprint để deploy Quantum Map OS lên Render.com
 #
 # Cách dùng:
-# 1. Tạo một Git repo (GitHub/GitLab) và đẩy TOÀN BỘ NỘI DUNG của thư mục "mapviet"
+# 1. Tạo một Git repo (GitHub/GitLab) và đẩy TOÀN BỘ NỘI DUNG của thư mục "quantum-map-os"
 #    (server.js, package.json, src/, public/, render.yaml, ...) lên làm gốc (root) repo đó.
 #    -> Nếu bạn để trong một repo lớn hơn (monorepo), vào Render Dashboard, mục
-#       "Root Directory" của service, nhập đường dẫn tới thư mục "mapviet" tương ứng.
+#       "Root Directory" của service, nhập đường dẫn tới thư mục "quantum-map-os" tương ứng.
 # 2. Vào Render Dashboard -> New -> Blueprint -> chọn repo đó.
 #    Render sẽ tự đọc file này và tạo Web Service tương ứng.
 # 3. Bấm "Apply" để Render build & deploy. Sau khi xong, mở đường dẫn Render cấp
-#    (dạng https://mapviet-neon.onrender.com).
+#    (dạng https://quantum-map-os.onrender.com).
 #
 # Tài khoản Admin mặc định vẫn là:
 #   tunglaihoclaptrinhmobile@1234 / TtungnguyenhoangNHmobile@142010
@@ -30,7 +30,7 @@
 
 services:
   - type: web
-    name: mapviet-neon
+    name: quantum-map-os
     runtime: node
     plan: free
     region: singapore
@@ -49,6 +49,6 @@ services:
 # nếu bạn nâng cấp gói trả phí và muốn dữ liệu không mất khi deploy lại:
 #
 #     disk:
-#       name: mapviet-data
+#       name: quantum-map-os-data
 #       mountPath: /opt/render/project/src/data
 #       sizeGB: 1

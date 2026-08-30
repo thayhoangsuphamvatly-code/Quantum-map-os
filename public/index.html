@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1" />
-<title>MapViet Neon</title>
+<title>Quantum Map OS</title>
 <meta name="theme-color" content="#07061a" />
 <link rel="manifest" href="manifest.json" />
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
@@ -23,9 +23,9 @@
     <!-- ============ SIDEBAR ============ -->
     <aside class="sidebar" id="sidebar">
       <div class="brand">
-        <div class="logo-mark" style="width:34px;height:34px;font-size:16px;">🛰️</div>
+        <img class="logo-mark" src="icons/logo-inline.png" alt="Quantum Map OS" style="width:34px;height:34px;" />
         <div>
-          <h1>MAPVIET</h1>
+          <h1>QUANTUM MAP OS</h1>
           <span>NEON MAPS</span>
         </div>
       </div>
@@ -42,6 +42,9 @@
         </div>
         <div class="nav-item" id="navAdmin" data-view="admin" style="display:none;">
           <span class="ic">🛡️</span> Quản Lý Tài Khoản
+        </div>
+        <div class="nav-item" id="navBusiness" data-view="business" style="display:none;">
+          <span class="ic">🏷️</span> Quảng Cáo Của Tôi
         </div>
       </nav>
 
@@ -184,6 +187,13 @@
               </button>
             </div>
 
+            <div class="place-section" id="areaIntroSection" style="display:none;">
+              <div class="place-section-title">Giới thiệu khu vực</div>
+              <p class="area-wiki-extract" id="areaWikiExtract" style="display:none;"></p>
+              <a href="#" target="_blank" rel="noopener" class="area-wiki-link" id="areaWikiLink" style="display:none;">Theo Wikipedia →</a>
+              <div class="area-stats-grid" id="areaStatsGrid"></div>
+            </div>
+
             <div class="place-section" id="nearbySection" style="display:none;">
               <div class="place-section-title">Gần đó</div>
               <div class="nearby-tabs" id="nearbyTabs">
@@ -197,11 +207,68 @@
               <div class="nearby-carousel" id="nearbyCarousel"></div>
             </div>
 
+            <div class="place-section" id="sponsoredSection" style="display:none;">
+              <div class="place-section-title">🏷️ Được quảng cáo gần đây</div>
+              <div class="nearby-carousel" id="sponsoredCarousel"></div>
+            </div>
+
             <div class="place-section" id="photosSection" style="display:none;">
               <div class="place-section-title">Ảnh</div>
               <div class="place-photos" id="placePhotos"></div>
             </div>
           </div>
+        </div>
+      </div>
+
+      <!-- PANEL QUANG CAO DOANH NGHIEP (chi tai khoan Doanh nghiep / Admin) -->
+      <div class="side-panel" id="businessPanel">
+        <div class="sheet-handle-bar"></div>
+        <div class="panel-head">
+          <h3>🏷️ Quảng Cáo Của Tôi</h3>
+          <button class="panel-close" data-close="businessPanel">✕</button>
+        </div>
+        <div class="panel-body">
+          <p class="hint-text">Địa điểm bạn quảng cáo sẽ hiển thị công khai trên bản đồ cho mọi người dùng, luôn có nhãn "🏷️ Quảng cáo" rõ ràng để minh bạch.</p>
+
+          <div id="businessEmptyState" class="empty-state" style="display:none;">
+            Bạn chưa có địa điểm quảng cáo nào.<br/>Tạo một địa điểm để bắt đầu quảng cáo.
+          </div>
+
+          <form id="businessForm" style="display:none;">
+            <input type="hidden" id="bizId" />
+            <div class="field">
+              <label>Tên địa điểm / cửa hàng</label>
+              <input type="text" id="bizName" placeholder="vd: Quán Cà Phê ABC" />
+            </div>
+            <div class="field">
+              <label>Danh mục</label>
+              <select class="role-select" id="bizCategory" style="width:100%;">
+                <option value="restaurant">🍜 Ăn uống</option>
+                <option value="cafe">☕ Cà phê</option>
+                <option value="hotel">🏨 Khách sạn</option>
+                <option value="shop">🛍️ Cửa hàng</option>
+                <option value="service">🔧 Dịch vụ</option>
+                <option value="other">📍 Khác</option>
+              </select>
+            </div>
+            <div class="field">
+              <label>Mô tả ngắn (tối đa 300 ký tự)</label>
+              <textarea id="bizDescription" rows="3" placeholder="Giới thiệu ngắn gọn về địa điểm của bạn..." style="width:100%; background:rgba(255,255,255,0.03); border:1px solid var(--border-soft); border-radius:8px; color:var(--text-main); padding:10px 12px; font-family:inherit; font-size:14px; resize:vertical;"></textarea>
+            </div>
+            <div class="field">
+              <label>Số điện thoại liên hệ</label>
+              <input type="text" id="bizPhone" placeholder="vd: 0901234567" />
+            </div>
+            <div class="route-point">
+              <span class="dot end"></span>
+              <input type="text" id="bizAddress" placeholder="Chọn vị trí trên bản đồ" readonly />
+              <button type="button" class="pin" id="bizPinBtn" title="Chọn trên bản đồ">📌</button>
+            </div>
+            <button type="button" class="btn btn-primary" id="btnSaveBusiness" style="width:100%; margin-top:10px;">Lưu địa điểm quảng cáo</button>
+            <button type="button" class="btn btn-danger" id="btnDeleteBusiness" style="width:100%; margin-top:8px; display:none;">Xóa địa điểm quảng cáo</button>
+          </form>
+
+          <button class="btn btn-primary" id="btnCreateBusiness" style="width:100%;">+ Tạo địa điểm quảng cáo</button>
         </div>
       </div>
 
@@ -254,6 +321,7 @@
       </div>
       <button class="sheet-item" id="installBtnMobile"><span class="ic">⬇️</span> Tải Ứng Dụng</button>
       <button class="sheet-item" id="navAdminMobile" style="display:none;"><span class="ic">🛡️</span> Quản Lý Tài Khoản</button>
+      <button class="sheet-item" id="navBusinessMobile" style="display:none;"><span class="ic">🏷️</span> Quảng Cáo Của Tôi</button>
       <button class="sheet-item danger" id="logoutBtnMobile"><span class="ic">⏻</span> Đăng xuất</button>
     </div>
   </div>
@@ -281,6 +349,20 @@
           </tr>
         </thead>
         <tbody id="userTableBody"></tbody>
+      </table>
+
+      <h3 class="admin-subheading">🏷️ Kiểm Duyệt Quảng Cáo Doanh Nghiệp</h3>
+      <table class="acc-table">
+        <thead>
+          <tr>
+            <th>Địa điểm</th>
+            <th>Danh mục</th>
+            <th>Chủ tài khoản</th>
+            <th>Địa chỉ</th>
+            <th>Thao Tác</th>
+          </tr>
+        </thead>
+        <tbody id="businessTableBody"></tbody>
       </table>
     </div>
   </div>
@@ -335,6 +417,12 @@
           <label class="switch"><input type="checkbox" id="permFavorites" checked /><span class="track"></span></label>
         </div>
       </div>
+      <div class="field">
+        <div class="perm-check-row" style="border-bottom:none;">
+          <span>🏷️ Tài khoản Doanh nghiệp (được gắn 1 địa điểm để quảng cáo)</span>
+          <label class="switch"><input type="checkbox" id="mIsBusiness" /><span class="track"></span></label>
+        </div>
+      </div>
       <div class="modal-actions">
         <button class="btn btn-ghost" id="btnCancelUserModal">Hủy</button>
         <button class="btn btn-primary" id="btnSaveUser">Lưu</button>
@@ -366,7 +454,7 @@
   <div class="modal-overlay" id="qrModal">
     <div class="modal-card" style="text-align:center;">
       <h3>📲 Gửi tới điện thoại</h3>
-      <p class="hint-text">Dùng điện thoại quét mã QR bên dưới để mở đúng vị trí này trong MapViet Neon.</p>
+      <p class="hint-text">Dùng điện thoại quét mã QR bên dưới để mở đúng vị trí này trong Quantum Map OS.</p>
       <div id="qrCodeBox" class="qr-box"></div>
       <div class="field" style="margin-top:14px;">
         <input type="text" id="qrShareLink" readonly style="text-align:center;" />

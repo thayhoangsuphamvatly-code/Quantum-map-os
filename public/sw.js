@@ -3,7 +3,7 @@
 // Cache "app shell" co ban de mo lai nhanh hon o lan sau; du lieu API (ban do,
 // tim duong...) luon lay moi tu mang, khong cache, vi day la thong tin thoi gian thuc.
 
-const CACHE_NAME = "mapviet-shell-v1";
+const CACHE_NAME = "quantum-map-os-shell-v1";
 const APP_SHELL = [
   "/login.html",
   "/index.html",

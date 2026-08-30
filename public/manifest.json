@@ -1,6 +1,6 @@
 {
-  "name": "MapViet Neon",
-  "short_name": "MapViet",
+  "name": "Quantum Map OS",
+  "short_name": "Quantum Map",
   "description": "Ứng dụng bản đồ, tìm đường và địa điểm yêu thích giao diện neon",
   "start_url": "/index.html",
   "scope": "/",

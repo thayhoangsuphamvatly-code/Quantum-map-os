@@ -3,6 +3,7 @@
 
 const AdminModule = (() => {
   let usersCache = [];
+  let businessCache = [];
 
   function el(id) { return document.getElementById(id); }
 
@@ -14,6 +15,48 @@ const AdminModule = (() => {
     } catch (e) {
       showToast(e.message, true);
     }
+  }
+
+  async function loadBusiness() {
+    try {
+      const data = await Api.get("/api/admin/business");
+      businessCache = data.listings || [];
+      renderBusinessTable();
+    } catch (e) {
+      showToast(e.message, true);
+    }
+  }
+
+  const BIZ_CATEGORY_LABEL = {
+    restaurant: "🍜 Ăn uống", cafe: "☕ Cà phê", hotel: "🏨 Khách sạn",
+    shop: "🛍️ Cửa hàng", service: "🔧 Dịch vụ", other: "📍 Khác"
+  };
+
+  function renderBusinessTable() {
+    const tbody = el("businessTableBody");
+    if (!businessCache.length) {
+      tbody.innerHTML = '<tr><td colspan="5" style="color:var(--text-faint); text-align:center; padding:24px;">Chưa có địa điểm quảng cáo nào.</td></tr>';
+      return;
+    }
+    tbody.innerHTML = businessCache.map(b => `
+      <tr>
+        <td>🏷️ ${escapeHtml(b.name)}</td>
+        <td>${BIZ_CATEGORY_LABEL[b.category] || b.category}</td>
+        <td>${escapeHtml(b.ownerUsername)}</td>
+        <td>${escapeHtml(b.address || "")}</td>
+        <td><button class="btn btn-danger btn-sm" data-del-biz="${b.id}">Gỡ bỏ</button></td>
+      </tr>
+    `).join("");
+    tbody.querySelectorAll("[data-del-biz]").forEach(btn => {
+      btn.addEventListener("click", async () => {
+        if (!confirm("Gỡ bỏ địa điểm quảng cáo này?")) return;
+        try {
+          await Api.del(`/api/admin/business/${btn.dataset.delBiz}`);
+          showToast("Đã gỡ bỏ quảng cáo");
+          loadBusiness();
+        } catch (e) { showToast(e.message, true); }
+      });
+    });
   }
 
   function permTags(perms) {
@@ -29,12 +72,13 @@ const AdminModule = (() => {
     tbody.innerHTML = usersCache.map(u => {
       const tierLabel = u.role === "ADMIN" ? "TOÀN QUYỀN" : (u.tier === "PRO" ? "PRO" : "STANDARD");
       const tierClass = u.role === "ADMIN" ? "admin" : (u.tier === "PRO" ? "pro" : "standard");
+      const bizBadge = u.isBusiness ? ' <span class="badge business">🏷️ DN</span>' : "";
       return `
       <tr data-id="${u.id}">
         <td>${escapeHtml(u.username)}${u.isRoot ? ' <span class="perm-tag on" title="Tài khoản admin gốc">GỐC</span>' : ""}</td>
         <td>${escapeHtml(u.fullName)}</td>
         <td><span class="badge ${u.role === "ADMIN" ? "admin" : "user"}">${u.role}</span></td>
-        <td><span class="badge ${tierClass}">${tierLabel}</span></td>
+        <td><span class="badge ${tierClass}">${tierLabel}</span>${bizBadge}</td>
         <td><span class="badge ${u.status === "active" ? "active" : "locked"}">${u.status === "active" ? "HOẠT ĐỘNG" : "ĐÃ KHÓA"}</span></td>
         <td><div class="perm-tags">${u.role === "ADMIN" ? '<span class="perm-tag on">Toàn quyền</span>' : permTags(u.permissions)}</div></td>
         <td>
@@ -63,6 +107,7 @@ const AdminModule = (() => {
     el("mPasswordLabel").textContent = "Mật khẩu";
     el("mRole").value = "USER";
     el("mTier").value = "STANDARD";
+    el("mIsBusiness").checked = false;
     updateTierFieldVisibility();
     setPermChecks({ search: true, route: true, locate: true, favorites: true });
     el("userModal").classList.add("open");
@@ -80,6 +125,7 @@ const AdminModule = (() => {
     el("mPasswordLabel").textContent = "Mật khẩu mới (để trống nếu không đổi)";
     el("mRole").value = u.role;
     el("mTier").value = u.tier === "PRO" ? "PRO" : "STANDARD";
+    el("mIsBusiness").checked = !!u.isBusiness;
     updateTierFieldVisibility();
     setPermChecks(u.permissions || {});
     el("userModal").classList.add("open");
@@ -109,19 +155,20 @@ const AdminModule = (() => {
     };
     const role = el("mRole").value;
     const tier = el("mTier").value;
+    const isBusiness = el("mIsBusiness").checked;
     const fullName = el("mFullName").value.trim();
     const password = el("mPassword").value;
 
     try {
       if (id) {
-        const payload = { fullName, role, tier, permissions };
+        const payload = { fullName, role, tier, isBusiness, permissions };
         if (password) payload.password = password;
         await Api.patch(`/api/admin/users/${id}`, payload);
         showToast("Đã cập nhật tài khoản");
       } else {
         const username = el("mUsername").value.trim();
         if (!username || !password) return showToast("Vui lòng nhập đầy đủ tài khoản và mật khẩu", true);
-        await Api.post("/api/admin/users", { username, password, fullName, role, tier, permissions });
+        await Api.post("/api/admin/users", { username, password, fullName, role, tier, isBusiness, permissions });
         showToast("Đã tạo tài khoản mới");
       }
       closeModal();
@@ -167,7 +214,7 @@ const AdminModule = (() => {
 
   document.addEventListener("DOMContentLoaded", bindEvents);
 
-  return { loadUsers };
+  return { loadUsers, loadBusiness };
 })();
 
 window.AdminModule = AdminModule;

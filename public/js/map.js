@@ -28,11 +28,20 @@ const MapModule = (() => {
   let navRerouteTimer = null;
   let lastRouteDestination = null;
   let weatherDebounceTimer = null;
+  let businessMarkers = {};
+  let businessDebounceTimer = null;
+  let myBusinessListings = [];
+  let pendingBusinessCoord = null;
 
   const pulseIcon = L.divIcon({ className: "", html: '<div class="neon-pulse-icon"></div>', iconSize: [18, 18] });
   const favIcon = L.divIcon({ className: "", html: '<div class="fav-marker-icon"></div>', iconSize: [16, 16] });
   const signalIcon = L.divIcon({ className: "", html: '<span class="signal-icon">🚦</span>', iconSize: [18, 18] });
   const hazardIcon = L.divIcon({ className: "", html: '<span class="hazard-icon">⚠️</span>', iconSize: [20, 20] });
+  const businessIcon = L.divIcon({ className: "", html: '<div class="business-marker-icon">🏷️</div>', iconSize: [26, 26] });
+
+  const BUSINESS_CATEGORY_ICON = {
+    restaurant: "🍜", cafe: "☕", hotel: "🏨", shop: "🛍️", service: "🔧", other: "📍"
+  };
 
   const FAV_CATEGORY_LABELS = {
     home: "🏠 Nhà", work: "🏢 Công ty", food: "🍔 Ăn uống",
@@ -62,6 +71,7 @@ const MapModule = (() => {
     bindPlacePanel();
     bindCategoryModal();
     bindQrModal();
+    bindBusinessPanel();
     applyTierToRouteUI();
     handleDeepLinkFromUrl();
 
@@ -233,12 +243,41 @@ const MapModule = (() => {
         badge.style.display = "flex";
       } catch (e) { /* thoi tiet chi la thong tin bo sung - im lang neu loi */ }
     }, 900);
+
+    clearTimeout(businessDebounceTimer);
+    businessDebounceTimer = setTimeout(loadBusinessMarkersInView, 900);
+  }
+
+  async function loadBusinessMarkersInView() {
+    if (!hasPermission("search")) return;
+    const c = map.getCenter();
+    const bounds = map.getBounds();
+    const radius = Math.min(haversineMeters(c.lat, c.lng, bounds.getNorthEast().lat, bounds.getNorthEast().lng), 8000);
+    try {
+      const data = await Api.get(`/api/business/nearby?lat=${c.lat}&lng=${c.lng}&radius=${Math.round(radius)}`);
+      const listings = data.listings || [];
+      const seenIds = new Set(listings.map(l => l.id));
+      Object.keys(businessMarkers).forEach(id => {
+        if (!seenIds.has(Number(id))) { map.removeLayer(businessMarkers[id]); delete businessMarkers[id]; }
+      });
+      listings.forEach(l => {
+        if (businessMarkers[l.id]) return;
+        const m = L.marker([l.lat, l.lng], { icon: businessIcon }).addTo(map)
+          .bindPopup(`<b>🏷️ ${escapeHtml(l.name)}</b><br/>Quảng cáo · ${escapeHtml(l.address || "")}`);
+        m.on("click", () => openPlaceDetail({ name: l.name, lat: l.lat, lng: l.lng, address: l.address, isSponsored: true, sponsoredInfo: l }));
+        businessMarkers[l.id] = m;
+      });
+    } catch (e) { /* lop quang cao la bo sung - im lang neu loi */ }
   }
 
   // ---------------- CLICK BAN DO ----------------
   async function onMapClick(e) {
-    if (pinMode) {
+    if (pinMode === "from" || pinMode === "to") {
       setRoutePoint(pinMode, e.latlng.lat, e.latlng.lng);
+      pinMode = null;
+      document.querySelectorAll(".pin").forEach(b => b.classList.remove("active"));
+    } else if (pinMode === "business") {
+      await setBusinessLocation(e.latlng.lat, e.latlng.lng);
       pinMode = null;
       document.querySelectorAll(".pin").forEach(b => b.classList.remove("active"));
     }
@@ -309,7 +348,7 @@ const MapModule = (() => {
   }
 
   async function openPlaceDetail(place) {
-    currentPlace = { name: place.name, address: place.address || null, lat: place.lat, lng: place.lng };
+    currentPlace = { name: place.name, address: place.address || null, lat: place.lat, lng: place.lng, isSponsored: !!place.isSponsored, sponsoredInfo: place.sponsoredInfo || null };
 
     closePanel("routePanel");
     closePanel("favPanel");
@@ -321,15 +360,27 @@ const MapModule = (() => {
     if (placeMarker) map.removeLayer(placeMarker);
     placeMarker = L.marker([place.lat, place.lng]).addTo(map);
 
-    document.getElementById("placeName").textContent = place.name || "Đang tải...";
+    renderPlaceNameHeader(place.name || "Đang tải...");
     document.getElementById("placeAddress").textContent = place.address || `${place.lat.toFixed(5)}, ${place.lng.toFixed(5)}`;
     document.getElementById("placeWeather").style.display = "none";
     document.getElementById("nearbySection").style.display = "none";
     document.getElementById("photosSection").style.display = "none";
+    document.getElementById("areaIntroSection").style.display = "none";
+    document.getElementById("sponsoredSection").style.display = "none";
+    document.getElementById("areaWikiExtract").style.display = "none";
+    document.getElementById("areaWikiLink").style.display = "none";
+    document.getElementById("areaStatsGrid").innerHTML = "";
     const hero = document.getElementById("placeHero");
     hero.className = "place-hero";
     hero.style.backgroundImage = "";
     hero.textContent = "🏞️";
+
+    // Neu la dia diem quang cao, hien them mo ta/SDT doanh nghiep da khai bao
+    if (place.isSponsored && place.sponsoredInfo) {
+      const info = place.sponsoredInfo;
+      const extra = [info.description, info.phone ? `☎ ${info.phone}` : null].filter(Boolean).join(" · ");
+      if (extra) document.getElementById("placeAddress").textContent += (place.address ? " — " : "") + extra;
+    }
 
     // Neu chua co dia chi/ten cu the -> geocode nguoc de lay dia chi
     if (!place.address && hasPermission("search")) {
@@ -337,7 +388,7 @@ const MapModule = (() => {
         const data = await Api.get(`/api/geo/reverse?lat=${place.lat}&lng=${place.lng}`);
         currentPlace.address = data.address;
         if (!currentPlace.name) currentPlace.name = data.address.split(",")[0];
-        document.getElementById("placeName").textContent = currentPlace.name;
+        renderPlaceNameHeader(currentPlace.name);
         document.getElementById("placeAddress").textContent = currentPlace.address;
       } catch (e) { /* giu toa do neu loi */ }
     }
@@ -365,7 +416,79 @@ const MapModule = (() => {
           }
         }).catch(() => {});
       }
+
+      // Gioi thieu khu vuc (Wikipedia that + thong ke POI that)
+      if (query) {
+        Api.get(`/api/geo/area-info?lat=${place.lat}&lng=${place.lng}&query=${encodeURIComponent(query)}`).then(data => {
+          renderAreaIntro(data);
+        }).catch(() => {});
+      }
+
+      // Cac dia diem duoc quang cao gan day (luon gan nhan ro rang, khong tron voi ket qua tu nhien)
+      Api.get(`/api/business/nearby?lat=${place.lat}&lng=${place.lng}&radius=3000`).then(data => {
+        renderSponsoredNearby(data.listings || []);
+      }).catch(() => {});
     }
+  }
+
+  function renderPlaceNameHeader(name) {
+    const nameEl = document.getElementById("placeName");
+    if (currentPlace && currentPlace.isSponsored) {
+      nameEl.innerHTML = `<span class="sponsor-tag">🏷️ QUẢNG CÁO</span><br/>${escapeHtml(name || "")}`;
+    } else {
+      nameEl.textContent = name || "—";
+    }
+  }
+
+  function renderAreaIntro(data) {
+    const section = document.getElementById("areaIntroSection");
+    const extractEl = document.getElementById("areaWikiExtract");
+    const linkEl = document.getElementById("areaWikiLink");
+    const statsGrid = document.getElementById("areaStatsGrid");
+
+    let hasContent = false;
+
+    if (data.wiki && data.wiki.extract) {
+      extractEl.textContent = data.wiki.extract;
+      extractEl.style.display = "block";
+      if (data.wiki.url) {
+        linkEl.href = data.wiki.url;
+        linkEl.style.display = "inline-block";
+      }
+      hasContent = true;
+    }
+
+    if (data.stats && data.stats.length) {
+      statsGrid.innerHTML = data.stats.map(s => `
+        <div class="area-stat-chip" title="${s.samples.map(escapeHtml).join(', ')}">
+          ${s.icon} <b>${s.count}</b> ${escapeHtml(s.label)}
+        </div>
+      `).join("");
+      hasContent = true;
+    }
+
+    section.style.display = hasContent ? "block" : "none";
+  }
+
+  function renderSponsoredNearby(listings) {
+    const section = document.getElementById("sponsoredSection");
+    const carousel = document.getElementById("sponsoredCarousel");
+    if (!listings.length) { section.style.display = "none"; return; }
+    carousel.innerHTML = listings.map((l, i) => `
+      <div class="nearby-card sponsored" data-idx="${i}">
+        <span class="sponsor-tag">🏷️ Quảng cáo</span>
+        <div class="nc-icon">${BUSINESS_CATEGORY_ICON[l.category] || "📍"}</div>
+        <div class="nc-name">${escapeHtml(l.name)}</div>
+        <div class="nc-dist">${formatDistance(l.distanceMeters)}</div>
+      </div>
+    `).join("");
+    [...carousel.children].forEach((el, i) => {
+      el.addEventListener("click", () => openPlaceDetail({
+        name: listings[i].name, lat: listings[i].lat, lng: listings[i].lng,
+        address: listings[i].address, isSponsored: true, sponsoredInfo: listings[i]
+      }));
+    });
+    section.style.display = "block";
   }
 
   async function fetchNearby(category) {
@@ -800,6 +923,105 @@ const MapModule = (() => {
     });
   }
 
+  // ---------------- QUAN LY QUANG CAO DOANH NGHIEP (tai khoan Business) ----------------
+  function bindBusinessPanel() {
+    document.getElementById("btnCreateBusiness").addEventListener("click", () => {
+      showBusinessForm({ id: "", name: "", category: "restaurant", description: "", phone: "", address: "", lat: null, lng: null });
+    });
+
+    document.getElementById("bizPinBtn").addEventListener("click", () => {
+      pinMode = pinMode === "business" ? null : "business";
+      document.getElementById("bizPinBtn").classList.toggle("active", pinMode === "business");
+      if (pinMode === "business") showToast("Nhấp vào bản đồ để chọn vị trí quảng cáo");
+    });
+
+    document.getElementById("btnSaveBusiness").addEventListener("click", saveBusinessListing);
+    document.getElementById("btnDeleteBusiness").addEventListener("click", deleteBusinessListingUi);
+  }
+
+  function showBusinessForm(listing) {
+    document.getElementById("businessEmptyState").style.display = "none";
+    document.getElementById("btnCreateBusiness").style.display = "none";
+    const form = document.getElementById("businessForm");
+    form.style.display = "block";
+
+    document.getElementById("bizId").value = listing.id || "";
+    document.getElementById("bizName").value = listing.name || "";
+    document.getElementById("bizCategory").value = listing.category || "restaurant";
+    document.getElementById("bizDescription").value = listing.description || "";
+    document.getElementById("bizPhone").value = listing.phone || "";
+    document.getElementById("bizAddress").value = listing.address || (listing.lat ? `${listing.lat.toFixed(5)}, ${listing.lng.toFixed(5)}` : "");
+    pendingBusinessCoord = listing.lat ? { lat: listing.lat, lng: listing.lng } : null;
+    document.getElementById("btnDeleteBusiness").style.display = listing.id ? "block" : "none";
+  }
+
+  async function setBusinessLocation(lat, lng) {
+    pendingBusinessCoord = { lat, lng };
+    let address = `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+    try {
+      const data = await Api.get(`/api/geo/reverse?lat=${lat}&lng=${lng}`);
+      address = data.address;
+    } catch (e) { /* fallback toa do */ }
+    document.getElementById("bizAddress").value = address;
+  }
+
+  async function loadMyBusiness() {
+    if (!AppState.user.isBusiness && AppState.user.role !== "ADMIN") return;
+    try {
+      const data = await Api.get("/api/business/mine");
+      myBusinessListings = data.listings || [];
+      if (myBusinessListings.length) {
+        showBusinessForm(myBusinessListings[0]);
+      } else {
+        document.getElementById("businessForm").style.display = "none";
+        document.getElementById("businessEmptyState").style.display = "block";
+        document.getElementById("btnCreateBusiness").style.display = "block";
+      }
+    } catch (e) {
+      showToast(e.message, true);
+    }
+  }
+
+  async function saveBusinessListing() {
+    const id = document.getElementById("bizId").value;
+    const name = document.getElementById("bizName").value.trim();
+    const category = document.getElementById("bizCategory").value;
+    const description = document.getElementById("bizDescription").value.trim();
+    const phone = document.getElementById("bizPhone").value.trim();
+    const address = document.getElementById("bizAddress").value.trim();
+
+    if (!name) return showToast("Vui lòng nhập tên địa điểm", true);
+    if (!pendingBusinessCoord) return showToast("Vui lòng chọn vị trí trên bản đồ (nút 📌)", true);
+
+    try {
+      if (id) {
+        await Api.patch(`/api/business/${id}`, { name, category, description, phone, address, lat: pendingBusinessCoord.lat, lng: pendingBusinessCoord.lng });
+        showToast("Đã cập nhật địa điểm quảng cáo");
+      } else {
+        await Api.post("/api/business", { name, category, description, phone, address, lat: pendingBusinessCoord.lat, lng: pendingBusinessCoord.lng });
+        showToast("Đã tạo địa điểm quảng cáo 🏷️");
+      }
+      loadMyBusiness();
+      loadBusinessMarkersInView();
+    } catch (e) {
+      showToast(e.message, true);
+    }
+  }
+
+  async function deleteBusinessListingUi() {
+    const id = document.getElementById("bizId").value;
+    if (!id) return;
+    if (!confirm("Xóa địa điểm quảng cáo này?")) return;
+    try {
+      await Api.del(`/api/business/${id}`);
+      showToast("Đã xóa địa điểm quảng cáo");
+      loadMyBusiness();
+      loadBusinessMarkersInView();
+    } catch (e) {
+      showToast(e.message, true);
+    }
+  }
+
   // ---------------- LIEN KET SAU (mo tu QR / link chia se) ----------------
   function handleDeepLinkFromUrl() {
     const params = new URLSearchParams(window.location.search);
@@ -813,7 +1035,7 @@ const MapModule = (() => {
 
   document.addEventListener("DOMContentLoaded", bindFavFilters);
 
-  return { init, invalidateSize, loadFavorites, applyTierToRouteUI };
+  return { init, invalidateSize, loadFavorites, applyTierToRouteUI, loadMyBusiness };
 })();
 
 window.MapModule = MapModule;

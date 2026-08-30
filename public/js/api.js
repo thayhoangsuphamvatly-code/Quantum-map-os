@@ -1,6 +1,6 @@
 // Lop goi API dung chung cho toan bo frontend.
 const Api = (() => {
-  const TOKEN_KEY = "mapviet_token";
+  const TOKEN_KEY = "quantum_map_os_token";
 
   function getToken() { return localStorage.getItem(TOKEN_KEY); }
   function setToken(t) { localStorage.setItem(TOKEN_KEY, t); }
