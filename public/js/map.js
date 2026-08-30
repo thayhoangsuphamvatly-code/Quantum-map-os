@@ -140,22 +140,26 @@ const MapModule = (() => {
       if (q.length < 2) { resultsBox.style.display = "none"; return; }
       if (!hasPermission("search")) return showToast("Bạn không có quyền tìm kiếm", true);
       try {
-        const data = await Api.get(`/api/geo/search?q=${encodeURIComponent(q)}`);
+        const c = map.getCenter();
+        const data = await Api.get(`/api/geo/search?q=${encodeURIComponent(q)}&nearLat=${c.lat}&nearLng=${c.lng}`);
         lastResults = data.results || [];
         highlightIndex = -1;
-        renderSearchResults(lastResults, q);
+        renderSearchResults(lastResults, q, data.approximate);
       } catch (e) {
         showToast(e.message, true);
       }
     }
 
-    function renderSearchResults(results, q) {
+    function renderSearchResults(results, q, approximate) {
       if (!results.length) {
-        resultsBox.innerHTML = '<div class="search-result-item">Không tìm thấy kết quả phù hợp</div>';
+        resultsBox.innerHTML = '<div class="search-result-item">Không tìm thấy kết quả phù hợp. Thử thêm tên phường/quận/thành phố để chính xác hơn.</div>';
         resultsBox.style.display = "block";
         return;
       }
-      resultsBox.innerHTML = results.map((r, i) => {
+      const note = approximate
+        ? `<div class="search-result-note">⚠️ Không tìm thấy đúng số nhà — đây là vị trí gần đúng theo tên đường.</div>`
+        : "";
+      resultsBox.innerHTML = note + results.map((r, i) => {
         const parts = r.name.split(",");
         const head = parts[0];
         const rest = parts.slice(1).join(",");
@@ -164,15 +168,16 @@ const MapModule = (() => {
         </div>`;
       }).join("");
       resultsBox.style.display = "block";
-      [...resultsBox.children].forEach((el, i) => {
-        el.addEventListener("click", () => selectResult(results[i]));
+      resultsBox.querySelectorAll(".search-result-item").forEach((el) => {
+        const idx = Number(el.dataset.idx);
+        el.addEventListener("click", () => selectResult(results[idx], approximate));
       });
     }
 
-    function selectResult(r) {
+    function selectResult(r, approximate) {
       resultsBox.style.display = "none";
       input.value = r.name;
-      openPlaceDetail({ name: r.name.split(",")[0], address: r.name, lat: r.lat, lng: r.lng });
+      openPlaceDetail({ name: r.name.split(",")[0], address: r.name, lat: r.lat, lng: r.lng, isApproximate: !!approximate });
     }
 
     input.addEventListener("input", () => {
@@ -199,8 +204,9 @@ const MapModule = (() => {
       }
     });
     function updateHighlight() {
-      [...resultsBox.children].forEach((el, i) => {
-        el.style.background = i === highlightIndex ? "rgba(34,211,238,0.14)" : "";
+      resultsBox.querySelectorAll(".search-result-item").forEach((el) => {
+        const idx = Number(el.dataset.idx);
+        el.style.background = idx === highlightIndex ? "rgba(34,211,238,0.14)" : "";
       });
     }
     btn.addEventListener("click", doSearch);
@@ -348,7 +354,7 @@ const MapModule = (() => {
   }
 
   async function openPlaceDetail(place) {
-    currentPlace = { name: place.name, address: place.address || null, lat: place.lat, lng: place.lng, isSponsored: !!place.isSponsored, sponsoredInfo: place.sponsoredInfo || null };
+    currentPlace = { name: place.name, address: place.address || null, lat: place.lat, lng: place.lng, isSponsored: !!place.isSponsored, sponsoredInfo: place.sponsoredInfo || null, isApproximate: !!place.isApproximate };
 
     closePanel("routePanel");
     closePanel("favPanel");
@@ -370,6 +376,7 @@ const MapModule = (() => {
     document.getElementById("areaWikiExtract").style.display = "none";
     document.getElementById("areaWikiLink").style.display = "none";
     document.getElementById("areaStatsGrid").innerHTML = "";
+    document.getElementById("placeApproxNotice").style.display = place.isApproximate ? "block" : "none";
     const hero = document.getElementById("placeHero");
     hero.className = "place-hero";
     hero.style.backgroundImage = "";
@@ -660,7 +667,8 @@ const MapModule = (() => {
     if (coord) return coord;
     const text = document.getElementById(textInputId).value.trim();
     if (!text) return null;
-    const data = await Api.get(`/api/geo/search?q=${encodeURIComponent(text)}`);
+    const c = map.getCenter();
+    const data = await Api.get(`/api/geo/search?q=${encodeURIComponent(text)}&nearLat=${c.lat}&nearLng=${c.lng}`);
     if (!data.results || !data.results.length) return null;
     return { lat: data.results[0].lat, lng: data.results[0].lng };
   }

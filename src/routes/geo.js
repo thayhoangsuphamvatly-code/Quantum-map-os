@@ -33,23 +33,90 @@ router.use(authenticate);
 // TIM KIEM DIA DIEM / GEOCODE NGUOC
 // ============================================================
 
+// Goi Nominatim mot lan voi cac tham so tuy chinh, tra ve mang ket qua da chuan hoa
+async function callNominatim(params) {
+  const url = `${NOMINATIM_BASE}/search?${params.toString()}`;
+  const resp = await fetch(url, { headers: { "User-Agent": APP_USER_AGENT, "Accept-Language": "vi" } });
+  if (!resp.ok) throw new Error("Dich vu tim kiem dang gap su co");
+  const data = await resp.json();
+  return data.map(item => ({
+    id: item.place_id,
+    name: item.display_name,
+    lat: parseFloat(item.lat),
+    lng: parseFloat(item.lon),
+    type: item.type,
+    boundingbox: item.boundingbox
+  }));
+}
+
+// Nhan dien cau truy van dang "<so nha> <ten duong...>" (vi du "194 Lac Trung")
+// de co the thu lai bang truong "street" chuyen dung cua Nominatim khi tim kiem
+// tu do (free-form) khong ra ket qua - Nominatim lap chi muc so nha o Viet Nam
+// khong day du nen can nhieu chien luoc thu lai.
+const HOUSE_NUMBER_PATTERN = /^(\d+[a-zA-ZÀ-ỹ]{0,3})[\s,]+(.+)$/u;
+
 router.get("/search", requirePermission("search"), async (req, res) => {
   const q = (req.query.q || "").toString().trim();
   if (!q) return res.status(400).json({ error: "Vui long nhap tu khoa tim kiem" });
+
+  // Uu tien ket qua gan vi tri nguoi dung dang xem tren ban do (bias mem, khong loai tru khu vuc khac)
+  const nearLat = parseFloat(req.query.nearLat);
+  const nearLng = parseFloat(req.query.nearLng);
+  const hasBias = Number.isFinite(nearLat) && Number.isFinite(nearLng);
+
+  function baseParams(query) {
+    const p = new URLSearchParams({ format: "jsonv2", addressdetails: "1", limit: "8", q: query });
+    if (hasBias) {
+      const d = 0.25; // ~25km khung uu tien, khong gioi han cung (bounded=0)
+      p.set("viewbox", `${nearLng - d},${nearLat + d},${nearLng + d},${nearLat - d}`);
+      p.set("bounded", "0");
+    }
+    return p;
+  }
+
   try {
-    const url = `${NOMINATIM_BASE}/search?format=jsonv2&addressdetails=1&limit=8&q=${encodeURIComponent(q)}`;
-    const resp = await fetch(url, { headers: { "User-Agent": APP_USER_AGENT, "Accept-Language": "vi" } });
-    if (!resp.ok) throw new Error("Dich vu tim kiem dang gap su co");
-    const data = await resp.json();
-    const results = data.map(item => ({
-      id: item.place_id,
-      name: item.display_name,
-      lat: parseFloat(item.lat),
-      lng: parseFloat(item.lon),
-      type: item.type,
-      boundingbox: item.boundingbox
-    }));
-    res.json({ results });
+    // Chien luoc 1: tim kiem tu do y nguyen nhu nguoi dung go
+    let results = await callNominatim(baseParams(q));
+
+    // Chien luoc 2: neu khong ra ket qua va cau truy van chua co "Viet Nam",
+    // them ngu canh quoc gia - Nominatim doi khi can dieu nay de khop dia chi co so nha
+    if (!results.length && !/viet\s*nam|vietnam/i.test(q)) {
+      results = await callNominatim(baseParams(`${q}, Việt Nam`));
+    }
+
+    // Chien luoc 3: neu van khong co, va cau truy van dang "<so nha> <duong...>",
+    // thu lai bang tim kiem co cau truc (structured search) voi truong "street"
+    // chuyen dung cho so nha + ten duong - chinh xac hon doi voi dia chi VN
+    if (!results.length) {
+      const m = q.match(HOUSE_NUMBER_PATTERN);
+      if (m) {
+        const structured = new URLSearchParams({
+          format: "jsonv2", addressdetails: "1", limit: "8",
+          street: q, country: "Việt Nam"
+        });
+        if (hasBias) {
+          const d = 0.25;
+          structured.set("viewbox", `${nearLng - d},${nearLat + d},${nearLng + d},${nearLat - d}`);
+          structured.set("bounded", "0");
+        }
+        results = await callNominatim(structured);
+      }
+    }
+
+    // Chien luoc 4: van khong co ket qua va co so nha - thu tim rieng TEN DUONG
+    // (bo so nha) de it nhat dua nguoi dung den dung con duong, kem ghi chu ro
+    // rang chi tim thay ten duong chu khong chinh xac so nha
+    let approximate = false;
+    if (!results.length) {
+      const m = q.match(HOUSE_NUMBER_PATTERN);
+      if (m) {
+        const streetOnly = m[2];
+        results = await callNominatim(baseParams(hasBias ? streetOnly : `${streetOnly}, Việt Nam`));
+        if (results.length) approximate = true;
+      }
+    }
+
+    res.json({ results, approximate });
   } catch (e) {
     res.status(502).json({ error: "Khong the ket noi dich vu tim kiem dia diem: " + e.message });
   }
