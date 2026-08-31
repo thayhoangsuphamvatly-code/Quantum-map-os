@@ -53,10 +53,14 @@ const MapModule = (() => {
 
   function init() {
     map = L.map("map", { zoomControl: true, attributionControl: true }).setView([21.0278, 105.8342], 13); // Ha Noi mac dinh
+    // Bo chu "Leaflet" khoi o ghi cong (chi la loi cam on tuy chon cua thu vien,
+    // khong bat buoc). Van GIU LAI ghi cong OpenStreetMap vi day la yeu cau bat
+    // buoc trong chinh sach su dung du lieu ban do mien phi cua OSM.
+    map.attributionControl.setPrefix(false);
 
     L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
       maxZoom: 19,
-      attribution: '&copy; OpenStreetMap'
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> contributors'
     }).addTo(map);
 
     signalLayerGroup = L.layerGroup().addTo(map);
@@ -641,6 +645,9 @@ const MapModule = (() => {
 
   // ---------------- TIM DUONG ----------------
   function bindRoutePanel() {
+    bindRouteInputAutocomplete("routeFrom", "routeFromResults", "from");
+    bindRouteInputAutocomplete("routeTo", "routeToResults", "to");
+
     document.querySelectorAll("#modeSwitch .mode-btn").forEach(btn => {
       btn.addEventListener("click", () => {
         document.querySelectorAll("#modeSwitch .mode-btn").forEach(b => b.classList.remove("active"));
@@ -695,34 +702,105 @@ const MapModule = (() => {
     routeToMarker = tmpMarker;
   }
 
+  function placeRouteMarker(which, lat, lng) {
+    if (which === "from") {
+      routeFromCoord = { lat, lng };
+      if (routeFromMarker) map.removeLayer(routeFromMarker);
+      routeFromMarker = L.circleMarker([lat, lng], { radius: 7, color: "#34d399", fillColor: "#34d399", fillOpacity: 1 }).addTo(map);
+    } else {
+      routeToCoord = { lat, lng };
+      if (routeToMarker) map.removeLayer(routeToMarker);
+      routeToMarker = L.circleMarker([lat, lng], { radius: 7, color: "#ec4899", fillColor: "#ec4899", fillOpacity: 1 }).addTo(map);
+    }
+  }
+
+  // Dung khi nguoi dung CHON MOT KET QUA CU THE tu danh sach goi y - da biet
+  // chinh xac ten day du + toa do, khong can (va khong nen) tu doan/geocode nguoc.
+  function setRoutePointFromResult(which, result) {
+    document.getElementById(which === "from" ? "routeFrom" : "routeTo").value = result.name;
+    placeRouteMarker(which, result.lat, result.lng);
+  }
+
+  // Dung khi nguoi dung CHON TREN BAN DO (nut 📌) - chi co toa do, can geocode
+  // nguoc de hien thi dia chi doc duoc cho nguoi dung.
   async function setRoutePoint(which, lat, lng) {
     let address = `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
     try {
       const data = await Api.get(`/api/geo/reverse?lat=${lat}&lng=${lng}`);
       address = data.address;
     } catch (e) { /* fallback toa do */ }
+    document.getElementById(which === "from" ? "routeFrom" : "routeTo").value = address;
+    placeRouteMarker(which, lat, lng);
+  }
 
-    if (which === "from") {
-      routeFromCoord = { lat, lng };
-      document.getElementById("routeFrom").value = address;
-      if (routeFromMarker) map.removeLayer(routeFromMarker);
-      routeFromMarker = L.circleMarker([lat, lng], { radius: 7, color: "#34d399", fillColor: "#34d399", fillOpacity: 1 }).addTo(map);
-    } else {
-      routeToCoord = { lat, lng };
-      document.getElementById("routeTo").value = address;
-      if (routeToMarker) map.removeLayer(routeToMarker);
-      routeToMarker = L.circleMarker([lat, lng], { radius: 7, color: "#ec4899", fillColor: "#ec4899", fillOpacity: 1 }).addTo(map);
+  // ---------------- GOI Y CHO O DIEM DI / DIEM DEN (bat buoc CHON tu danh
+  // sach thay vi doan mo ho, de tranh geocode nham dia diem trung ten o xa) ----
+  function bindRouteInputAutocomplete(inputId, resultsId, which) {
+    const input = document.getElementById(inputId);
+    const box = document.getElementById(resultsId);
+    let debounceTimer = null;
+    let results = [];
+
+    async function doSearch() {
+      const q = input.value.trim();
+      if (q.length < 2) { box.style.display = "none"; return; }
+      if (!hasPermission("search")) return;
+      try {
+        const c = map.getCenter();
+        const data = await Api.get(`/api/geo/search?q=${encodeURIComponent(q)}&nearLat=${c.lat}&nearLng=${c.lng}`);
+        results = data.results || [];
+        render(data.approximate);
+      } catch (e) { /* loi tim kiem goi y - im lang, nguoi dung co the thu lai */ }
     }
+
+    function render(approximate) {
+      if (!results.length) {
+        box.innerHTML = '<div class="search-result-item">Không tìm thấy kết quả phù hợp</div>';
+        box.style.display = "block";
+        return;
+      }
+      const note = approximate
+        ? `<div class="search-result-note">⚠️ Chỉ tìm thấy tên đường gần đúng, chưa chắc đúng số nhà.</div>`
+        : "";
+      box.innerHTML = note + results.map((r, i) => {
+        const parts = r.name.split(",");
+        const icon = placeTypeIcon(r.class, r.type);
+        return `<div class="search-result-item" data-idx="${i}">
+          <b>${icon} ${escapeHtml(parts[0])}</b>${escapeHtml(parts.slice(1).join(","))}
+        </div>`;
+      }).join("");
+      box.style.display = "block";
+      box.querySelectorAll(".search-result-item").forEach(el => {
+        const idx = Number(el.dataset.idx);
+        if (Number.isNaN(idx)) return;
+        el.addEventListener("click", () => {
+          setRoutePointFromResult(which, results[idx]);
+          box.style.display = "none";
+        });
+      });
+    }
+
+    input.addEventListener("input", () => {
+      // Nguoi dung dang go lai -> toa do da chon truoc do (neu co) khong con
+      // dang tin cay nua, xoa de bat buoc chon lai tu danh sach goi y moi
+      if (which === "from") routeFromCoord = null; else routeToCoord = null;
+      clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(doSearch, 250);
+    });
+    input.addEventListener("focus", () => { if (results.length && input.value.trim().length >= 2) box.style.display = "block"; });
+    document.addEventListener("click", (e) => {
+      if (!e.target.closest(`#${inputId}`) && !e.target.closest(`#${resultsId}`)) box.style.display = "none";
+    });
   }
 
   async function geocodeIfNeeded(coord, textInputId) {
-    if (coord) return coord;
+    if (coord) return { ...coord, autoResolved: false };
     const text = document.getElementById(textInputId).value.trim();
     if (!text) return null;
     const c = map.getCenter();
     const data = await Api.get(`/api/geo/search?q=${encodeURIComponent(text)}&nearLat=${c.lat}&nearLng=${c.lng}`);
     if (!data.results || !data.results.length) return null;
-    return { lat: data.results[0].lat, lng: data.results[0].lng };
+    return { lat: data.results[0].lat, lng: data.results[0].lng, name: data.results[0].name, autoResolved: true };
   }
 
   function clearAltLines() {
@@ -741,7 +819,15 @@ const MapModule = (() => {
       const to = await geocodeIfNeeded(routeToCoord, "routeTo");
       if (!from || !to) return showToast("Vui lòng nhập hoặc chọn đầy đủ điểm đi và điểm đến", true);
 
-      showToast("Đang tính toán đường đi...");
+      const autoWarnings = [];
+      if (from.autoResolved) autoWarnings.push(`điểm đi "${from.name.split(",")[0]}"`);
+      if (to.autoResolved) autoWarnings.push(`điểm đến "${to.name.split(",")[0]}"`);
+      if (autoWarnings.length) {
+        showToast(`⚠️ Chưa chọn từ gợi ý — đang dùng vị trí gần đúng cho ${autoWarnings.join(" và ")}`, true);
+      } else {
+        showToast("Đang tính toán đường đi...");
+      }
+
       const now = new Date();
       const localHour = now.getHours();
       const isWeekend = now.getDay() === 0 || now.getDay() === 6;

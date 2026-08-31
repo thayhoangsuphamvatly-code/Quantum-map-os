@@ -46,6 +46,8 @@ async function callNominatim(params) {
     lng: parseFloat(item.lon),
     type: item.type,
     class: item.class,
+    importance: typeof item.importance === "number" ? item.importance : 0.2,
+    hasHouseNumber: !!(item.address && item.address.house_number),
     boundingbox: item.boundingbox,
     source: "nominatim"
   }));
@@ -72,6 +74,8 @@ async function callPhoton(query) {
       lng: f.geometry.coordinates[0],
       type: p.osm_value || p.type,
       class: p.osm_key,
+      importance: p.housenumber ? 0.35 : 0.25, // uu tien nhe cho ket qua co so nha ro rang
+      hasHouseNumber: !!p.housenumber,
       source: "photon"
     };
   });
@@ -142,6 +146,17 @@ router.get("/search", requirePermission("search"), async (req, res) => {
     // thu lai bang tim kiem co cau truc (structured search) voi truong "street"
     // chuyen dung cho so nha + ten duong - chinh xac hon doi voi dia chi VN
     const houseMatch = q.match(HOUSE_NUMBER_PATTERN);
+
+    // QUAN TRONG: voi cac truy van KHONG PHAI dia chi so nha (vi du ten tinh/
+    // thanh/dia danh nhu "Phu Tho"), uu tien mem theo vi tri nguoi dung co the
+    // vo tinh day mot dia danh NHO trung ten (vi du mot phuong/xa gan do) len
+    // tren dia danh CHINH THUC noi tieng hon (vi du ca tinh Phu Tho). De sua,
+    // sap xep lai theo diem "importance" cua Nominatim (danh gia do noi bat/
+    // quan trong cua dia danh) thay vi chi dua vao thu tu da bi bias vi tri.
+    if (!houseMatch && results.length > 1) {
+      results = [...results].sort((a, b) => b.importance - a.importance);
+    }
+
     if (!results.length && houseMatch) {
       const structured = new URLSearchParams({
         format: "jsonv2", addressdetails: "1", limit: "8",

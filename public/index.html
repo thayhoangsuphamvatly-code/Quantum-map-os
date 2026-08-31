@@ -86,15 +86,21 @@
           <p class="hint-text" id="motorbikeHint" style="display:none;">Lưu ý: chưa có máy chủ chỉ đường miễn phí riêng cho xe máy nên tuyến đường đang xấp xỉ theo hồ sơ ô tô.</p>
 
           <div class="route-points-wrap">
-            <div class="route-point">
-              <span class="dot start"></span>
-              <input type="text" id="routeFrom" placeholder="Chọn điểm đi" />
-              <button class="pin" data-pin="from" title="Chọn trên bản đồ">📌</button>
+            <div class="route-point-field">
+              <div class="route-point">
+                <span class="dot start"></span>
+                <input type="text" id="routeFrom" placeholder="Chọn điểm đi" autocomplete="off" />
+                <button class="pin" data-pin="from" title="Chọn trên bản đồ">📌</button>
+              </div>
+              <div class="search-results route-suggest" id="routeFromResults" style="display:none;"></div>
             </div>
-            <div class="route-point">
-              <span class="dot end"></span>
-              <input type="text" id="routeTo" placeholder="Chọn điểm đến" />
-              <button class="pin" data-pin="to" title="Chọn trên bản đồ">📌</button>
+            <div class="route-point-field">
+              <div class="route-point">
+                <span class="dot end"></span>
+                <input type="text" id="routeTo" placeholder="Chọn điểm đến" autocomplete="off" />
+                <button class="pin" data-pin="to" title="Chọn trên bản đồ">📌</button>
+              </div>
+              <div class="search-results route-suggest" id="routeToResults" style="display:none;"></div>
             </div>
             <button class="route-swap-btn" id="btnSwapRoute" title="Đổi chiều điểm đi/đến">⇅</button>
           </div>

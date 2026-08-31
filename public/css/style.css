@@ -545,6 +545,19 @@ button { font-family: inherit; }
 .route-points-wrap {
   position: relative;
 }
+.route-point-field {
+  position: relative;
+  margin-bottom: 10px;
+}
+.route-point-field .route-point { margin-bottom: 0; }
+.route-suggest {
+  position: absolute;
+  left: 0; right: 0; top: calc(100% + 4px);
+  z-index: 30;
+  background: var(--bg-panel-solid);
+  border-radius: var(--radius-sm);
+  max-height: 220px;
+}
 .route-point {
   display: flex; align-items: center; gap: 10px; margin-bottom: 10px;
   min-width: 0;
